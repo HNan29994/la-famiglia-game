@@ -9,11 +9,17 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as TribunaleRouteImport } from './routes/tribunale'
 import { Route as PlayRouteImport } from './routes/play'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as PlayerPlayerIdRouteImport } from './routes/player.$playerId'
 
+const TribunaleRoute = TribunaleRouteImport.update({
+  id: '/tribunale',
+  path: '/tribunale',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PlayRoute = PlayRouteImport.update({
   id: '/play',
   path: '/play',
@@ -39,12 +45,14 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
   '/play': typeof PlayRoute
+  '/tribunale': typeof TribunaleRoute
   '/player/$playerId': typeof PlayerPlayerIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
   '/play': typeof PlayRoute
+  '/tribunale': typeof TribunaleRoute
   '/player/$playerId': typeof PlayerPlayerIdRoute
 }
 export interface FileRoutesById {
@@ -52,25 +60,34 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
   '/play': typeof PlayRoute
+  '/tribunale': typeof TribunaleRoute
   '/player/$playerId': typeof PlayerPlayerIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/admin' | '/play' | '/player/$playerId'
+  fullPaths: '/' | '/admin' | '/play' | '/tribunale' | '/player/$playerId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/admin' | '/play' | '/player/$playerId'
-  id: '__root__' | '/' | '/admin' | '/play' | '/player/$playerId'
+  to: '/' | '/admin' | '/play' | '/tribunale' | '/player/$playerId'
+  id: '__root__' | '/' | '/admin' | '/play' | '/tribunale' | '/player/$playerId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRoute
   PlayRoute: typeof PlayRoute
+  TribunaleRoute: typeof TribunaleRoute
   PlayerPlayerIdRoute: typeof PlayerPlayerIdRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/tribunale': {
+      id: '/tribunale'
+      path: '/tribunale'
+      fullPath: '/tribunale'
+      preLoaderRoute: typeof TribunaleRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/play': {
       id: '/play'
       path: '/play'
@@ -106,8 +123,19 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRoute,
   PlayRoute: PlayRoute,
+  TribunaleRoute: TribunaleRoute,
   PlayerPlayerIdRoute: PlayerPlayerIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
