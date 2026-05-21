@@ -47,8 +47,9 @@ function TribunalePage() {
   useEffect(() => {
     if (!gameId) return;
     refresh(gameId);
-    const ch = supabase.channel(`trib-${gameId}`)
-      .on("postgres_changes", { event: "*", schema: "public" }, () => refresh(gameId))
+    const id = gameId;
+    const ch = supabase.channel(`trib-${id}`)
+      .on("postgres_changes", { event: "*", schema: "public" }, () => refresh(id))
       .subscribe();
     return () => { supabase.removeChannel(ch); };
   }, [gameId]);
