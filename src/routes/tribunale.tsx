@@ -70,7 +70,7 @@ function TribunalePage() {
   const event = SPECIAL_EVENTS[game.current_night];
 
   async function setPhase(phase: any) {
-    await supabase.from("games").update({ phase }).eq("id", gameId);
+    await supabase.from("games").update({ phase }).eq("id", gameId!);
   }
 
   // Discussion timer
