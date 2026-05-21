@@ -14,7 +14,366 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      alliances: {
+        Row: {
+          created_at: string
+          game_id: string
+          id: string
+          night: number
+          partner_id: string
+          requester_id: string
+          status: Database["public"]["Enums"]["alliance_status"]
+        }
+        Insert: {
+          created_at?: string
+          game_id: string
+          id?: string
+          night: number
+          partner_id: string
+          requester_id: string
+          status?: Database["public"]["Enums"]["alliance_status"]
+        }
+        Update: {
+          created_at?: string
+          game_id?: string
+          id?: string
+          night?: number
+          partner_id?: string
+          requester_id?: string
+          status?: Database["public"]["Enums"]["alliance_status"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "alliances_game_id_fkey"
+            columns: ["game_id"]
+            isOneToOne: false
+            referencedRelation: "games"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "alliances_partner_id_fkey"
+            columns: ["partner_id"]
+            isOneToOne: false
+            referencedRelation: "players"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "alliances_requester_id_fkey"
+            columns: ["requester_id"]
+            isOneToOne: false
+            referencedRelation: "players"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      arrests: {
+        Row: {
+          capo_id: string
+          created_at: string
+          game_id: string
+          id: string
+          night: number
+          target_id: string
+          was_correct: boolean | null
+        }
+        Insert: {
+          capo_id: string
+          created_at?: string
+          game_id: string
+          id?: string
+          night: number
+          target_id: string
+          was_correct?: boolean | null
+        }
+        Update: {
+          capo_id?: string
+          created_at?: string
+          game_id?: string
+          id?: string
+          night?: number
+          target_id?: string
+          was_correct?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "arrests_capo_id_fkey"
+            columns: ["capo_id"]
+            isOneToOne: false
+            referencedRelation: "players"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "arrests_game_id_fkey"
+            columns: ["game_id"]
+            isOneToOne: false
+            referencedRelation: "games"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "arrests_target_id_fkey"
+            columns: ["target_id"]
+            isOneToOne: false
+            referencedRelation: "players"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      drink_assignments: {
+        Row: {
+          created_at: string
+          fingers: number
+          from_player_id: string
+          game_id: string
+          id: string
+          night: number
+          to_player_id: string
+        }
+        Insert: {
+          created_at?: string
+          fingers?: number
+          from_player_id: string
+          game_id: string
+          id?: string
+          night: number
+          to_player_id: string
+        }
+        Update: {
+          created_at?: string
+          fingers?: number
+          from_player_id?: string
+          game_id?: string
+          id?: string
+          night?: number
+          to_player_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "drink_assignments_from_player_id_fkey"
+            columns: ["from_player_id"]
+            isOneToOne: false
+            referencedRelation: "players"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "drink_assignments_game_id_fkey"
+            columns: ["game_id"]
+            isOneToOne: false
+            referencedRelation: "games"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "drink_assignments_to_player_id_fkey"
+            columns: ["to_player_id"]
+            isOneToOne: false
+            referencedRelation: "players"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      games: {
+        Row: {
+          created_at: string
+          current_night: number
+          id: string
+          name: string
+          phase: Database["public"]["Enums"]["game_phase"]
+        }
+        Insert: {
+          created_at?: string
+          current_night?: number
+          id?: string
+          name?: string
+          phase?: Database["public"]["Enums"]["game_phase"]
+        }
+        Update: {
+          created_at?: string
+          current_night?: number
+          id?: string
+          name?: string
+          phase?: Database["public"]["Enums"]["game_phase"]
+        }
+        Relationships: []
+      }
+      players: {
+        Row: {
+          created_at: string
+          game_id: string
+          id: string
+          name: string
+          pin: string | null
+          total_points: number
+        }
+        Insert: {
+          created_at?: string
+          game_id: string
+          id?: string
+          name: string
+          pin?: string | null
+          total_points?: number
+        }
+        Update: {
+          created_at?: string
+          game_id?: string
+          id?: string
+          name?: string
+          pin?: string | null
+          total_points?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "players_game_id_fkey"
+            columns: ["game_id"]
+            isOneToOne: false
+            referencedRelation: "games"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      role_assignments: {
+        Row: {
+          created_at: string
+          game_id: string
+          id: string
+          mission_1: string
+          mission_1_state: Database["public"]["Enums"]["mission_state"]
+          mission_2: string
+          mission_2_state: Database["public"]["Enums"]["mission_state"]
+          night: number
+          night_points: number
+          player_id: string
+          role: Database["public"]["Enums"]["player_role"]
+        }
+        Insert: {
+          created_at?: string
+          game_id: string
+          id?: string
+          mission_1: string
+          mission_1_state?: Database["public"]["Enums"]["mission_state"]
+          mission_2: string
+          mission_2_state?: Database["public"]["Enums"]["mission_state"]
+          night: number
+          night_points?: number
+          player_id: string
+          role: Database["public"]["Enums"]["player_role"]
+        }
+        Update: {
+          created_at?: string
+          game_id?: string
+          id?: string
+          mission_1?: string
+          mission_1_state?: Database["public"]["Enums"]["mission_state"]
+          mission_2?: string
+          mission_2_state?: Database["public"]["Enums"]["mission_state"]
+          night?: number
+          night_points?: number
+          player_id?: string
+          role?: Database["public"]["Enums"]["player_role"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "role_assignments_game_id_fkey"
+            columns: ["game_id"]
+            isOneToOne: false
+            referencedRelation: "games"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "role_assignments_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "players"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      suspect_tips: {
+        Row: {
+          capo_id: string
+          game_id: string
+          id: string
+          night: number
+          suspect_ids: string[]
+        }
+        Insert: {
+          capo_id: string
+          game_id: string
+          id?: string
+          night: number
+          suspect_ids: string[]
+        }
+        Update: {
+          capo_id?: string
+          game_id?: string
+          id?: string
+          night?: number
+          suspect_ids?: string[]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "suspect_tips_capo_id_fkey"
+            columns: ["capo_id"]
+            isOneToOne: false
+            referencedRelation: "players"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "suspect_tips_game_id_fkey"
+            columns: ["game_id"]
+            isOneToOne: false
+            referencedRelation: "games"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      votes: {
+        Row: {
+          created_at: string
+          game_id: string
+          id: string
+          night: number
+          target_id: string
+          voter_id: string
+        }
+        Insert: {
+          created_at?: string
+          game_id: string
+          id?: string
+          night: number
+          target_id: string
+          voter_id: string
+        }
+        Update: {
+          created_at?: string
+          game_id?: string
+          id?: string
+          night?: number
+          target_id?: string
+          voter_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "votes_game_id_fkey"
+            columns: ["game_id"]
+            isOneToOne: false
+            referencedRelation: "games"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "votes_target_id_fkey"
+            columns: ["target_id"]
+            isOneToOne: false
+            referencedRelation: "players"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "votes_voter_id_fkey"
+            columns: ["voter_id"]
+            isOneToOne: false
+            referencedRelation: "players"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -23,7 +382,20 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      alliance_status: "pending" | "accepted" | "declined" | "broken"
+      game_phase:
+        | "setup"
+        | "night_active"
+        | "tribunale_missions"
+        | "tribunale_arrests"
+        | "tribunale_discussion"
+        | "tribunale_voting"
+        | "tribunale_reveal"
+        | "tribunale_leaderboard"
+        | "tribunale_drinks"
+        | "finished"
+      mission_state: "pending" | "completed" | "failed"
+      player_role: "capo" | "traitor" | "civilian"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +522,22 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      alliance_status: ["pending", "accepted", "declined", "broken"],
+      game_phase: [
+        "setup",
+        "night_active",
+        "tribunale_missions",
+        "tribunale_arrests",
+        "tribunale_discussion",
+        "tribunale_voting",
+        "tribunale_reveal",
+        "tribunale_leaderboard",
+        "tribunale_drinks",
+        "finished",
+      ],
+      mission_state: ["pending", "completed", "failed"],
+      player_role: ["capo", "traitor", "civilian"],
+    },
   },
 } as const
