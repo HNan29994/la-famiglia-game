@@ -170,8 +170,9 @@ function RoleReveal({ assignment, revealed, onReveal }: any) {
 }
 
 function MissionsCard({ assignment, disabled }: any) {
-  async function setState(field: "mission_1_state" | "mission_2_state", value: string) {
-    const { error } = await supabase.from("role_assignments").update({ [field]: value }).eq("id", assignment.id);
+  async function setState(field: "mission_1_state" | "mission_2_state", value: any) {
+    const payload: any = { [field]: value };
+    const { error } = await supabase.from("role_assignments").update(payload).eq("id", assignment.id);
     if (error) toast.error(error.message); else toast.success("Logged");
   }
   const mission = (text: string, state: string, field: any) => (
@@ -260,7 +261,7 @@ function AllianceCard({ gameId, night, me, allPlayers, myAlliance, incoming, ref
     const { error } = await supabase.from("alliances").insert({ game_id: gameId, night, requester_id: me.id, partner_id: target });
     if (error) toast.error(error.message); else { toast.success("Request sent"); setTarget(""); refresh(); }
   }
-  async function respond(status: string) {
+  async function respond(status: any) {
     await supabase.from("alliances").update({ status }).eq("id", incoming.id);
     refresh();
   }
