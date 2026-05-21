@@ -140,7 +140,7 @@ function AdminConsole({ gameId, onReset }: { gameId: string; onReset: () => void
   votes.forEach((v) => { voteCount[v.target_id] = (voteCount[v.target_id] || 0) + 1; });
   const uniqueVoters = new Set(votes.map((v) => v.voter_id)).size;
 
-  async function setPhase(phase: string) {
+  async function setPhase(phase: any) {
     await supabase.from("games").update({ phase }).eq("id", gameId);
   }
 
