@@ -71,12 +71,24 @@ function PlayerView() {
   if (!player) return <div className="p-8 text-center text-muted-foreground">…</div>;
   if (!game) return <div className="p-8 text-center text-muted-foreground">…</div>;
 
+  const readyLabel: Record<string, string> = {
+    setup: `Begin Notte ${game.current_night}`,
+    night_active: "Ready for Il Tribunale",
+    tribunale_missions: "Continue · Reveal arrests",
+    tribunale_arrests: "Continue · Open discussion",
+    tribunale_discussion: "Open the vote",
+    tribunale_voting: "I've voted",
+    tribunale_reveal: "Continue · Tally scores",
+    tribunale_leaderboard: "Continue · Pour drinks",
+    tribunale_drinks: game.current_night >= 3 ? "End trip · Crown Padrino" : `Advance to Notte ${game.current_night + 1}`,
+  };
+
   return (
     <div className="min-h-screen px-5 max-w-md mx-auto pb-20">
       <AppHeader subtitle={`Welcome, ${player.name}`} />
 
       {game.phase === "setup" && (
-        <EmptyState text={`Notte ${game.current_night} has not yet begun. Wait for Il Padrino…`} />
+        <EmptyState text={`Notte ${game.current_night} has not yet begun. Tap ready when the family is ready to start.`} />
       )}
 
       {assignment && (game.phase === "night_active" || game.phase.startsWith("tribunale_")) && (
@@ -88,6 +100,14 @@ function PlayerView() {
                 assignment={assignment}
                 disabled={!game.phase.startsWith("tribunale_") && game.phase !== "night_active"}
               />
+              {assignment.role === "traitor" && assignment.bonus_mission && game.phase === "night_active" && (
+                <MurderMissionCard
+                  assignment={assignment}
+                  gameId={game.id}
+                  night={game.current_night}
+                  allPlayers={allPlayers}
+                />
+              )}
               {assignment.role === "capo" && suspectTip && (
                 <SuspectTipCard suspectIds={suspectTip} allPlayers={allPlayers} />
               )}
@@ -121,7 +141,10 @@ function PlayerView() {
                 />
               )}
               {(game.phase === "tribunale_reveal" || game.phase === "tribunale_leaderboard" || game.phase === "tribunale_drinks") && (
-                <NightSummaryCard assignment={assignment} />
+                <>
+                  <DeceasedPanel murders={murders} allPlayers={allPlayers} meId={playerId} />
+                  <NightSummaryCard assignment={assignment} />
+                </>
               )}
             </>
           )}
@@ -135,6 +158,17 @@ function PlayerView() {
       )}
 
       <Leaderboard players={allPlayers} meId={playerId} />
+
+      {game.phase !== "finished" && readyLabel[game.phase] && (
+        <ReadyButton
+          gameId={game.id}
+          playerId={playerId}
+          night={game.current_night}
+          phase={game.phase}
+          label={readyLabel[game.phase]}
+          playerCount={allPlayers.length}
+        />
+      )}
     </div>
   );
 }
