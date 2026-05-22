@@ -117,7 +117,7 @@ export async function beginNight(gameId: string, night: number) {
       mission_2: m2,
       bonus_mission,
       bonus_target_id,
-      bonus_mission_state: "pending",
+      bonus_mission_state: "pending" as const,
     };
   });
   const { error: insErr } = await supabase.from("role_assignments").insert(rows);
