@@ -5,6 +5,8 @@ import { AppHeader } from "@/components/AppHeader";
 import { Ornament } from "@/components/Ornament";
 import { RoleBadge, roleMeta } from "@/components/RoleBadge";
 import type { Role } from "@/lib/game";
+import { recordMurder, abandonMurder } from "@/lib/game";
+import { ReadyButton } from "@/components/ReadyButton";
 import { SPECIAL_EVENTS } from "@/lib/missions";
 import { toast } from "sonner";
 
@@ -25,6 +27,7 @@ function PlayerView() {
   const [incomingAlliance, setIncomingAlliance] = useState<any>(null);
   const [myVotes, setMyVotes] = useState<any[]>([]);
   const [revealed, setRevealed] = useState(false);
+  const [murders, setMurders] = useState<any[]>([]);
 
   async function refresh() {
     const { data: p } = await supabase.from("players").select("*").eq("id", playerId).single();
@@ -47,6 +50,8 @@ function PlayerView() {
       setIncomingAlliance(inAl?.[0] || null);
       const { data: v } = await supabase.from("votes").select("*").eq("game_id", p.game_id).eq("night", g.current_night).eq("voter_id", playerId);
       setMyVotes(v || []);
+      const { data: m } = await supabase.from("murders").select("*").eq("game_id", p.game_id).eq("night", g.current_night);
+      setMurders(m || []);
     }
   }
 
