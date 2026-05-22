@@ -35,7 +35,7 @@ function Index() {
             to="/admin"
             className="block w-full text-center font-display tracking-widest text-xs uppercase border border-[var(--gold)]/40 text-gold py-3 rounded-sm hover:bg-[var(--gold)]/10 transition"
           >
-            Il Padrino · Admin
+            Set Up · New Game
           </Link>
         </div>
         <Ornament>NIGHTS · 3</Ornament>
