@@ -212,6 +212,14 @@ export async function scoreNight(gameId: string, night: number) {
 
     // Traitor survives undetected
     if (a.role === "traitor" && !votedOut.has(a.player_id)) pts += 3;
+    // Traitor bonus murder mission: +4 pts if completed and not voted out
+    if (
+      a.role === "traitor" &&
+      a.bonus_mission_state === "completed" &&
+      !votedOut.has(a.player_id)
+    ) {
+      pts += 4;
+    }
     // Civilian correctly voted for a traitor
     if (a.role === "civilian") {
       const myVotes = votes?.filter((v: any) => v.voter_id === a.player_id) || [];
