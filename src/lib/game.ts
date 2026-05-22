@@ -275,6 +275,138 @@ export async function scoreNight(gameId: string, night: number) {
   }
 }
 
+/**
+ * Record a murder by a traitor on their bonus target.
+ * Marks the bonus mission as completed and inserts a murders row.
+ */
+export async function recordMurder(
+  assignmentId: string,
+  gameId: string,
+  night: number,
+  traitorId: string,
+  victimId: string,
+) {
+  await supabase
+    .from("role_assignments")
+    .update({ bonus_mission_state: "completed" })
+    .eq("id", assignmentId);
+  await supabase.from("murders").insert({
+    game_id: gameId,
+    night,
+    traitor_id: traitorId,
+    victim_id: victimId,
+    fingers: MURDER_FINGERS,
+  });
+}
+
+export async function abandonMurder(assignmentId: string) {
+  await supabase
+    .from("role_assignments")
+    .update({ bonus_mission_state: "failed" })
+    .eq("id", assignmentId);
+}
+
+/** Toggle this player's "ready" state for the current game phase + night. */
+export async function toggleReady(
+  gameId: string,
+  playerId: string,
+  night: number,
+  phase: string,
+  currentlyReady: boolean,
+) {
+  if (currentlyReady) {
+    await supabase
+      .from("phase_ready")
+      .delete()
+      .eq("game_id", gameId)
+      .eq("player_id", playerId)
+      .eq("night", night)
+      .eq("phase", phase as any);
+  } else {
+    await supabase
+      .from("phase_ready")
+      .insert({ game_id: gameId, player_id: playerId, night, phase: phase as any });
+  }
+}
+
+/**
+ * Map of (current phase) -> (next phase). For phases that need side effects
+ * (beginNight, scoreNight), tryAdvancePhase handles them inline.
+ */
+const NEXT_PHASE: Record<string, string> = {
+  setup: "night_active",
+  night_active: "tribunale_missions",
+  tribunale_missions: "tribunale_arrests",
+  tribunale_arrests: "tribunale_discussion",
+  tribunale_discussion: "tribunale_voting",
+  tribunale_voting: "tribunale_reveal",
+  tribunale_reveal: "tribunale_leaderboard",
+  tribunale_leaderboard: "tribunale_drinks",
+  tribunale_drinks: "setup", // means: advance night (or finish)
+};
+
+/**
+ * If a majority of players are ready for the current phase, atomically perform
+ * the next transition. Uses phase_transitions PK as a lock so multiple phones
+ * racing each other only run the transition once.
+ */
+export async function tryAdvancePhase(gameId: string) {
+  const { data: g } = await supabase.from("games").select("*").eq("id", gameId).single();
+  if (!g) return;
+  const night = g.current_night;
+  const phase = g.phase as string;
+
+  const { count: readyCount } = await supabase
+    .from("phase_ready")
+    .select("*", { count: "exact", head: true })
+    .eq("game_id", gameId)
+    .eq("night", night)
+    .eq("phase", phase as any);
+  const { count: playerCount } = await supabase
+    .from("players")
+    .select("*", { count: "exact", head: true })
+    .eq("game_id", gameId);
+
+  const needed = Math.floor((playerCount ?? 0) / 2) + 1;
+  if ((readyCount ?? 0) < needed) return;
+
+  // Acquire the lock — PK conflict means another phone already triggered.
+  const { error: lockErr } = await supabase
+    .from("phase_transitions")
+    .insert({ game_id: gameId, night, from_phase: phase as any });
+  if (lockErr) return; // already transitioned
+
+  const next = NEXT_PHASE[phase];
+  if (!next) return;
+
+  // Side effects per transition
+  if (phase === "setup") {
+    // Start the current night
+    await beginNight(gameId, night);
+    return;
+  }
+  if (phase === "tribunale_voting") {
+    await scoreNight(gameId, night);
+    await supabase.from("games").update({ phase: "tribunale_reveal" as any }).eq("id", gameId);
+    return;
+  }
+  if (phase === "tribunale_drinks") {
+    if (night >= 3) {
+      await supabase.from("games").update({ phase: "finished" as any }).eq("id", gameId);
+    } else {
+      // Advance to next night and immediately begin it
+      await supabase
+        .from("games")
+        .update({ current_night: night + 1, phase: "setup" as any })
+        .eq("id", gameId);
+      await beginNight(gameId, night + 1);
+    }
+    return;
+  }
+
+  await supabase.from("games").update({ phase: next as any }).eq("id", gameId);
+}
+
 export function getStoredGameId(): string | null {
   if (typeof window === "undefined") return null;
   return localStorage.getItem("famiglia_game_id");
