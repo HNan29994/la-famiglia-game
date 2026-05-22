@@ -54,6 +54,15 @@ function TribunalePage() {
     return () => { supabase.removeChannel(ch); };
   }, [gameId]);
 
+  // Discussion timer — must be declared before any conditional return
+  // to keep hook order stable across renders.
+  useEffect(() => {
+    if (game?.phase !== "tribunale_discussion") return;
+    setTimer(180);
+    const t = setInterval(() => setTimer((s) => Math.max(0, s - 1)), 1000);
+    return () => clearInterval(t);
+  }, [game?.phase]);
+
   if (!gameId || !game) {
     return (
       <div className="min-h-screen px-6 max-w-md mx-auto">
@@ -72,14 +81,6 @@ function TribunalePage() {
   async function setPhase(phase: any) {
     await supabase.from("games").update({ phase }).eq("id", gameId!);
   }
-
-  // Discussion timer
-  useEffect(() => {
-    if (game?.phase !== "tribunale_discussion") return;
-    setTimer(180);
-    const t = setInterval(() => setTimer((s) => Math.max(0, s - 1)), 1000);
-    return () => clearInterval(t);
-  }, [game?.phase]);
 
   return (
     <div className="min-h-screen px-5 max-w-2xl mx-auto pb-20">
