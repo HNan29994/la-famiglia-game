@@ -22,6 +22,7 @@ function TribunalePage() {
   const [arrests, setArrests] = useState<any[]>([]);
   const [votes, setVotes] = useState<any[]>([]);
   const [timer, setTimer] = useState(180);
+  const [murders, setMurders] = useState<any[]>([]);
 
   useEffect(() => {
     const id = getStoredGameId();
@@ -41,6 +42,8 @@ function TribunalePage() {
       setArrests(ar || []);
       const { data: v } = await supabase.from("votes").select("*").eq("game_id", id).eq("night", g.current_night);
       setVotes(v || []);
+      const { data: m } = await supabase.from("murders").select("*").eq("game_id", id).eq("night", g.current_night);
+      setMurders(m || []);
     }
   }
 
@@ -68,19 +71,15 @@ function TribunalePage() {
       <div className="min-h-screen px-6 max-w-md mx-auto">
         <AppHeader subtitle="No active tribunal" />
         <div className="text-center font-serif italic text-muted-foreground mt-10">
-          Begin a game from the admin chamber first.
+          No game in session. Set one up from the lobby first.
         </div>
-        <Link to="/admin" className="block text-center mt-6 font-display tracking-widest text-xs uppercase text-gold underline">Admin →</Link>
+        <Link to="/admin" className="block text-center mt-6 font-display tracking-widest text-xs uppercase text-gold underline">Lobby →</Link>
       </div>
     );
   }
 
   const playerById = Object.fromEntries(players.map((p) => [p.id, p]));
   const event = SPECIAL_EVENTS[game.current_night];
-
-  async function setPhase(phase: any) {
-    await supabase.from("games").update({ phase }).eq("id", gameId!);
-  }
 
   return (
     <div className="min-h-screen px-5 max-w-2xl mx-auto pb-20">
@@ -92,24 +91,35 @@ function TribunalePage() {
         <div className="text-sm font-serif italic text-muted-foreground mt-2">{event.description}</div>
       </div>
 
+      <div className="mt-3 text-center text-[10px] tracking-widest uppercase text-muted-foreground">
+        Shared screen · phases advance when a majority of players tap ready on their phones
+      </div>
+
+      {murders.length > 0 &&
+        (game.phase === "tribunale_reveal" ||
+          game.phase === "tribunale_leaderboard" ||
+          game.phase === "tribunale_drinks") && (
+          <DeceasedReveal murders={murders} playerById={playerById} />
+        )}
+
       {/* Phase router */}
       {game.phase === "tribunale_missions" && (
-        <MissionReport assignments={assignments} playerById={playerById} onNext={() => setPhase("tribunale_arrests")} />
+        <MissionReport assignments={assignments} playerById={playerById} />
       )}
       {game.phase === "tribunale_arrests" && (
-        <ArrestsReveal arrests={arrests} playerById={playerById} onNext={() => setPhase("tribunale_discussion")} />
+        <ArrestsReveal arrests={arrests} playerById={playerById} />
       )}
       {game.phase === "tribunale_discussion" && (
-        <DiscussionPhase timer={timer} onNext={() => setPhase("tribunale_voting")} />
+        <DiscussionPhase timer={timer} />
       )}
       {game.phase === "tribunale_voting" && (
-        <VotingPhase players={players} votes={votes} onClose={() => setPhase("tribunale_reveal")} />
+        <VotingPhase players={players} votes={votes} />
       )}
       {game.phase === "tribunale_reveal" && (
-        <RoleReveal assignments={assignments} playerById={playerById} night={game.current_night} onNext={() => setPhase("tribunale_leaderboard")} />
+        <RoleReveal assignments={assignments} playerById={playerById} night={game.current_night} />
       )}
       {game.phase === "tribunale_leaderboard" && (
-        <NightLeaderboard assignments={assignments} playerById={playerById} onNext={() => setPhase("tribunale_drinks")} />
+        <NightLeaderboard assignments={assignments} playerById={playerById} />
       )}
       {game.phase === "tribunale_drinks" && (
         <DrinkPhase gameId={gameId} night={game.current_night} assignments={assignments} players={players} />
@@ -367,6 +377,31 @@ function Finale({ players }: { players: any[] }) {
             <span className="font-display text-gold">{p.total_points}</span>
           </div>
         ))}
+      </div>
+    </div>
+  );
+}
+function DeceasedReveal({ murders, playerById }: { murders: any[]; playerById: Record<string, any> }) {
+  return (
+    <div className="mt-6 bg-[var(--blood)]/15 border border-[var(--blood)] rounded-sm p-5">
+      <div className="text-center text-[10px] tracking-[0.4em] uppercase text-[var(--blood)] mb-3">
+        † The Deceased Tonight †
+      </div>
+      <div className="space-y-2">
+        {murders.map((m: any) => (
+          <div
+            key={m.id}
+            className="flex justify-between items-center font-serif text-base border-b border-[var(--blood)]/20 py-2"
+          >
+            <span>{playerById[m.victim_id]?.name}</span>
+            <span className="text-[var(--blood)] font-display tracking-widest text-sm">
+              🥃 {m.fingers} FINGERS
+            </span>
+          </div>
+        ))}
+      </div>
+      <div className="mt-3 text-center text-xs font-serif italic text-muted-foreground">
+        Pour. Drink. Carry on. The assassins remain hidden.
       </div>
     </div>
   );

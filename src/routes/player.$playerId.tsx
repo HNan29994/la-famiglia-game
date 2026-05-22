@@ -5,6 +5,8 @@ import { AppHeader } from "@/components/AppHeader";
 import { Ornament } from "@/components/Ornament";
 import { RoleBadge, roleMeta } from "@/components/RoleBadge";
 import type { Role } from "@/lib/game";
+import { recordMurder, abandonMurder } from "@/lib/game";
+import { ReadyButton } from "@/components/ReadyButton";
 import { SPECIAL_EVENTS } from "@/lib/missions";
 import { toast } from "sonner";
 
@@ -25,6 +27,7 @@ function PlayerView() {
   const [incomingAlliance, setIncomingAlliance] = useState<any>(null);
   const [myVotes, setMyVotes] = useState<any[]>([]);
   const [revealed, setRevealed] = useState(false);
+  const [murders, setMurders] = useState<any[]>([]);
 
   async function refresh() {
     const { data: p } = await supabase.from("players").select("*").eq("id", playerId).single();
@@ -47,6 +50,8 @@ function PlayerView() {
       setIncomingAlliance(inAl?.[0] || null);
       const { data: v } = await supabase.from("votes").select("*").eq("game_id", p.game_id).eq("night", g.current_night).eq("voter_id", playerId);
       setMyVotes(v || []);
+      const { data: m } = await supabase.from("murders").select("*").eq("game_id", p.game_id).eq("night", g.current_night);
+      setMurders(m || []);
     }
   }
 
@@ -66,12 +71,24 @@ function PlayerView() {
   if (!player) return <div className="p-8 text-center text-muted-foreground">…</div>;
   if (!game) return <div className="p-8 text-center text-muted-foreground">…</div>;
 
+  const readyLabel: Record<string, string> = {
+    setup: `Begin Notte ${game.current_night}`,
+    night_active: "Ready for Il Tribunale",
+    tribunale_missions: "Continue · Reveal arrests",
+    tribunale_arrests: "Continue · Open discussion",
+    tribunale_discussion: "Open the vote",
+    tribunale_voting: "I've voted",
+    tribunale_reveal: "Continue · Tally scores",
+    tribunale_leaderboard: "Continue · Pour drinks",
+    tribunale_drinks: game.current_night >= 3 ? "End trip · Crown Padrino" : `Advance to Notte ${game.current_night + 1}`,
+  };
+
   return (
     <div className="min-h-screen px-5 max-w-md mx-auto pb-20">
       <AppHeader subtitle={`Welcome, ${player.name}`} />
 
       {game.phase === "setup" && (
-        <EmptyState text={`Notte ${game.current_night} has not yet begun. Wait for Il Padrino…`} />
+        <EmptyState text={`Notte ${game.current_night} has not yet begun. Tap ready when the family is ready to start.`} />
       )}
 
       {assignment && (game.phase === "night_active" || game.phase.startsWith("tribunale_")) && (
@@ -83,6 +100,14 @@ function PlayerView() {
                 assignment={assignment}
                 disabled={!game.phase.startsWith("tribunale_") && game.phase !== "night_active"}
               />
+              {assignment.role === "traitor" && assignment.bonus_mission && game.phase === "night_active" && (
+                <MurderMissionCard
+                  assignment={assignment}
+                  gameId={game.id}
+                  night={game.current_night}
+                  allPlayers={allPlayers}
+                />
+              )}
               {assignment.role === "capo" && suspectTip && (
                 <SuspectTipCard suspectIds={suspectTip} allPlayers={allPlayers} />
               )}
@@ -116,7 +141,10 @@ function PlayerView() {
                 />
               )}
               {(game.phase === "tribunale_reveal" || game.phase === "tribunale_leaderboard" || game.phase === "tribunale_drinks") && (
-                <NightSummaryCard assignment={assignment} />
+                <>
+                  <DeceasedPanel murders={murders} allPlayers={allPlayers} meId={playerId} />
+                  <NightSummaryCard assignment={assignment} />
+                </>
               )}
             </>
           )}
@@ -130,6 +158,17 @@ function PlayerView() {
       )}
 
       <Leaderboard players={allPlayers} meId={playerId} />
+
+      {game.phase !== "finished" && readyLabel[game.phase] && (
+        <ReadyButton
+          gameId={game.id}
+          playerId={playerId}
+          night={game.current_night}
+          phase={game.phase}
+          label={readyLabel[game.phase]}
+          playerCount={allPlayers.length}
+        />
+      )}
     </div>
   );
 }
@@ -367,6 +406,89 @@ function NightSummaryCard({ assignment }: any) {
     <div className="mt-6 bg-card border border-gold rounded-sm p-4 text-center">
       <div className="text-[10px] tracking-widest uppercase text-gold mb-2">Notte Risultato</div>
       <div className="font-display text-3xl text-shimmer">+{assignment.night_points} pt</div>
+    </div>
+  );
+}
+
+function MurderMissionCard({ assignment, gameId, night, allPlayers }: any) {
+  const targetName = allPlayers.find((p: any) => p.id === assignment.bonus_target_id)?.name || "your target";
+  const state = assignment.bonus_mission_state as "pending" | "completed" | "failed";
+
+  async function kill() {
+    if (!assignment.bonus_target_id) return;
+    await recordMurder(assignment.id, gameId, night, assignment.player_id, assignment.bonus_target_id);
+    toast.success(`${targetName} sleeps with the fishes.`);
+  }
+  async function abandon() {
+    await abandonMurder(assignment.id);
+    toast("Mission abandoned.");
+  }
+
+  return (
+    <div className="mt-3 bg-[var(--blood)]/15 border border-[var(--blood)] rounded-sm p-4">
+      <div className="text-[10px] tracking-widest uppercase text-[var(--blood)] mb-2">
+        Bonus · Murder Mission · +4 pt
+      </div>
+      <div className="font-serif text-base leading-snug">
+        Eliminate <span className="font-display text-[var(--blood)]">{targetName.toUpperCase()}</span>.
+        Get them to take a long drink ({3} fingers) without revealing yourself.
+      </div>
+      {state === "pending" && (
+        <div className="flex gap-2 mt-3">
+          <button
+            onClick={kill}
+            className="flex-1 text-xs font-display tracking-widest uppercase py-2 rounded-sm bg-[var(--blood)] text-foreground"
+          >
+            ✓ Confirm kill
+          </button>
+          <button
+            onClick={abandon}
+            className="flex-1 text-xs font-display tracking-widest uppercase py-2 rounded-sm border border-[var(--gold)]/30 text-gold"
+          >
+            Abandon
+          </button>
+        </div>
+      )}
+      {state === "completed" && (
+        <div className="mt-3 text-center text-xs font-display tracking-widest text-[var(--blood)]">
+          KILL CONFIRMED · POURS REVEALED AT IL TRIBUNALE
+        </div>
+      )}
+      {state === "failed" && (
+        <div className="mt-3 text-center text-xs font-display tracking-widest text-muted-foreground">
+          MISSION ABANDONED
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DeceasedPanel({ murders, allPlayers, meId }: { murders: any[]; allPlayers: any[]; meId: string }) {
+  if (!murders || murders.length === 0) return null;
+  const playerById = Object.fromEntries(allPlayers.map((p) => [p.id, p]));
+  return (
+    <div className="mt-6 bg-[var(--blood)]/15 border border-[var(--blood)] rounded-sm p-4">
+      <div className="text-[10px] tracking-widest uppercase text-[var(--blood)] mb-3 text-center">
+        † The Deceased Tonight †
+      </div>
+      <div className="space-y-2">
+        {murders.map((m) => {
+          const victim = playerById[m.victim_id];
+          const isMe = m.victim_id === meId;
+          return (
+            <div
+              key={m.id}
+              className={`flex justify-between items-center font-serif text-sm border-b border-[var(--blood)]/20 py-1 ${isMe ? "text-[var(--blood)] font-bold" : ""}`}
+            >
+              <span>{victim?.name}{isMe ? " (you)" : ""}</span>
+              <span className="text-[var(--blood)]">🥃 {m.fingers} fingers</span>
+            </div>
+          );
+        })}
+      </div>
+      <div className="mt-3 text-center text-[10px] tracking-widest uppercase text-muted-foreground italic">
+        Pour. Drink. Carry on.
+      </div>
     </div>
   );
 }

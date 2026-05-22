@@ -194,6 +194,81 @@ export type Database = {
         }
         Relationships: []
       }
+      murders: {
+        Row: {
+          created_at: string
+          fingers: number
+          game_id: string
+          id: string
+          night: number
+          traitor_id: string
+          victim_id: string
+        }
+        Insert: {
+          created_at?: string
+          fingers?: number
+          game_id: string
+          id?: string
+          night: number
+          traitor_id: string
+          victim_id: string
+        }
+        Update: {
+          created_at?: string
+          fingers?: number
+          game_id?: string
+          id?: string
+          night?: number
+          traitor_id?: string
+          victim_id?: string
+        }
+        Relationships: []
+      }
+      phase_ready: {
+        Row: {
+          created_at: string
+          game_id: string
+          night: number
+          phase: Database["public"]["Enums"]["game_phase"]
+          player_id: string
+        }
+        Insert: {
+          created_at?: string
+          game_id: string
+          night: number
+          phase: Database["public"]["Enums"]["game_phase"]
+          player_id: string
+        }
+        Update: {
+          created_at?: string
+          game_id?: string
+          night?: number
+          phase?: Database["public"]["Enums"]["game_phase"]
+          player_id?: string
+        }
+        Relationships: []
+      }
+      phase_transitions: {
+        Row: {
+          created_at: string
+          from_phase: Database["public"]["Enums"]["game_phase"]
+          game_id: string
+          night: number
+        }
+        Insert: {
+          created_at?: string
+          from_phase: Database["public"]["Enums"]["game_phase"]
+          game_id: string
+          night: number
+        }
+        Update: {
+          created_at?: string
+          from_phase?: Database["public"]["Enums"]["game_phase"]
+          game_id?: string
+          night?: number
+        }
+        Relationships: []
+      }
       players: {
         Row: {
           created_at: string
@@ -231,6 +306,11 @@ export type Database = {
       }
       role_assignments: {
         Row: {
+          bonus_mission: string | null
+          bonus_mission_state:
+            | Database["public"]["Enums"]["mission_state"]
+            | null
+          bonus_target_id: string | null
           created_at: string
           game_id: string
           id: string
@@ -244,6 +324,11 @@ export type Database = {
           role: Database["public"]["Enums"]["player_role"]
         }
         Insert: {
+          bonus_mission?: string | null
+          bonus_mission_state?:
+            | Database["public"]["Enums"]["mission_state"]
+            | null
+          bonus_target_id?: string | null
           created_at?: string
           game_id: string
           id?: string
@@ -257,6 +342,11 @@ export type Database = {
           role: Database["public"]["Enums"]["player_role"]
         }
         Update: {
+          bonus_mission?: string | null
+          bonus_mission_state?:
+            | Database["public"]["Enums"]["mission_state"]
+            | null
+          bonus_target_id?: string | null
           created_at?: string
           game_id?: string
           id?: string
