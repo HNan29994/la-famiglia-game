@@ -3,6 +3,8 @@ import { pickTwoMissions } from "./missions";
 
 export type Role = "capo" | "traitor" | "civilian";
 
+export const MURDER_FINGERS = 3;
+
 /** Scale role counts to the actual player count. */
 export function roleCountsFor(n: number): Record<Role, number> {
   let capo = 2;
@@ -92,9 +94,20 @@ export async function beginNight(gameId: string, night: number) {
   await supabase.from("suspect_tips").delete().eq("game_id", gameId).eq("night", night);
 
   // Insert role assignments with missions
+  const traitorIds = ids.filter((id) => assignment[id] === "traitor");
+  const nonTraitorIds = ids.filter((id) => assignment[id] !== "traitor");
+  const playerNames: Record<string, string> = {};
+  (players as any[]).forEach((p: any) => (playerNames[p.id] = p.name));
+
   const rows = ids.map((pid) => {
     const role = assignment[pid];
     const [m1, m2] = pickTwoMissions(role);
+    let bonus_mission: string | null = null;
+    let bonus_target_id: string | null = null;
+    if (role === "traitor" && nonTraitorIds.length > 0) {
+      bonus_target_id = nonTraitorIds[Math.floor(Math.random() * nonTraitorIds.length)];
+      bonus_mission = `Eliminate ${playerNames[bonus_target_id]} — get them to take a long drink without revealing yourself.`;
+    }
     return {
       game_id: gameId,
       player_id: pid,
@@ -102,6 +115,9 @@ export async function beginNight(gameId: string, night: number) {
       role,
       mission_1: m1,
       mission_2: m2,
+      bonus_mission,
+      bonus_target_id,
+      bonus_mission_state: "pending",
     };
   });
   const { error: insErr } = await supabase.from("role_assignments").insert(rows);
@@ -109,7 +125,6 @@ export async function beginNight(gameId: string, night: number) {
 
   // Create suspect tips for each Capo
   const capoIds = ids.filter((id) => assignment[id] === "capo");
-  const traitorIds = ids.filter((id) => assignment[id] === "traitor");
   const civilianIds = ids.filter((id) => assignment[id] === "civilian");
 
   const tipRows = capoIds.map((capoId) => {
@@ -122,7 +137,7 @@ export async function beginNight(gameId: string, night: number) {
       suspect_ids: shuffle([realTraitor, ...decoys]),
     };
   });
-  if (tipRows.length > 0) {
+  if (tipRows.length > 0 && traitorIds.length > 0) {
     const { error: tErr } = await supabase.from("suspect_tips").insert(tipRows);
     if (tErr) throw tErr;
   }
