@@ -381,3 +381,28 @@ function Finale({ players }: { players: any[] }) {
     </div>
   );
 }
+function DeceasedReveal({ murders, playerById }: { murders: any[]; playerById: Record<string, any> }) {
+  return (
+    <div className="mt-6 bg-[var(--blood)]/15 border border-[var(--blood)] rounded-sm p-5">
+      <div className="text-center text-[10px] tracking-[0.4em] uppercase text-[var(--blood)] mb-3">
+        † The Deceased Tonight †
+      </div>
+      <div className="space-y-2">
+        {murders.map((m: any) => (
+          <div
+            key={m.id}
+            className="flex justify-between items-center font-serif text-base border-b border-[var(--blood)]/20 py-2"
+          >
+            <span>{playerById[m.victim_id]?.name}</span>
+            <span className="text-[var(--blood)] font-display tracking-widest text-sm">
+              🥃 {m.fingers} FINGERS
+            </span>
+          </div>
+        ))}
+      </div>
+      <div className="mt-3 text-center text-xs font-serif italic text-muted-foreground">
+        Pour. Drink. Carry on. The assassins remain hidden.
+      </div>
+    </div>
+  );
+}
