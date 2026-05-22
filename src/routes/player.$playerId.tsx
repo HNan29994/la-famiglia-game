@@ -410,6 +410,89 @@ function NightSummaryCard({ assignment }: any) {
   );
 }
 
+function MurderMissionCard({ assignment, gameId, night, allPlayers }: any) {
+  const targetName = allPlayers.find((p: any) => p.id === assignment.bonus_target_id)?.name || "your target";
+  const state = assignment.bonus_mission_state as "pending" | "completed" | "failed";
+
+  async function kill() {
+    if (!assignment.bonus_target_id) return;
+    await recordMurder(assignment.id, gameId, night, assignment.player_id, assignment.bonus_target_id);
+    toast.success(`${targetName} sleeps with the fishes.`);
+  }
+  async function abandon() {
+    await abandonMurder(assignment.id);
+    toast("Mission abandoned.");
+  }
+
+  return (
+    <div className="mt-3 bg-[var(--blood)]/15 border border-[var(--blood)] rounded-sm p-4">
+      <div className="text-[10px] tracking-widest uppercase text-[var(--blood)] mb-2">
+        Bonus · Murder Mission · +4 pt
+      </div>
+      <div className="font-serif text-base leading-snug">
+        Eliminate <span className="font-display text-[var(--blood)]">{targetName.toUpperCase()}</span>.
+        Get them to take a long drink ({3} fingers) without revealing yourself.
+      </div>
+      {state === "pending" && (
+        <div className="flex gap-2 mt-3">
+          <button
+            onClick={kill}
+            className="flex-1 text-xs font-display tracking-widest uppercase py-2 rounded-sm bg-[var(--blood)] text-foreground"
+          >
+            ✓ Confirm kill
+          </button>
+          <button
+            onClick={abandon}
+            className="flex-1 text-xs font-display tracking-widest uppercase py-2 rounded-sm border border-[var(--gold)]/30 text-gold"
+          >
+            Abandon
+          </button>
+        </div>
+      )}
+      {state === "completed" && (
+        <div className="mt-3 text-center text-xs font-display tracking-widest text-[var(--blood)]">
+          KILL CONFIRMED · POURS REVEALED AT IL TRIBUNALE
+        </div>
+      )}
+      {state === "failed" && (
+        <div className="mt-3 text-center text-xs font-display tracking-widest text-muted-foreground">
+          MISSION ABANDONED
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DeceasedPanel({ murders, allPlayers, meId }: { murders: any[]; allPlayers: any[]; meId: string }) {
+  if (!murders || murders.length === 0) return null;
+  const playerById = Object.fromEntries(allPlayers.map((p) => [p.id, p]));
+  return (
+    <div className="mt-6 bg-[var(--blood)]/15 border border-[var(--blood)] rounded-sm p-4">
+      <div className="text-[10px] tracking-widest uppercase text-[var(--blood)] mb-3 text-center">
+        † The Deceased Tonight †
+      </div>
+      <div className="space-y-2">
+        {murders.map((m) => {
+          const victim = playerById[m.victim_id];
+          const isMe = m.victim_id === meId;
+          return (
+            <div
+              key={m.id}
+              className={`flex justify-between items-center font-serif text-sm border-b border-[var(--blood)]/20 py-1 ${isMe ? "text-[var(--blood)] font-bold" : ""}`}
+            >
+              <span>{victim?.name}{isMe ? " (you)" : ""}</span>
+              <span className="text-[var(--blood)]">🥃 {m.fingers} fingers</span>
+            </div>
+          );
+        })}
+      </div>
+      <div className="mt-3 text-center text-[10px] tracking-widest uppercase text-muted-foreground italic">
+        Pour. Drink. Carry on.
+      </div>
+    </div>
+  );
+}
+
 function Leaderboard({ players, meId }: { players: any[]; meId: string }) {
   const sorted = [...players].sort((a, b) => b.total_points - a.total_points);
   return (
