@@ -3,11 +3,20 @@ import { pickTwoMissions } from "./missions";
 
 export type Role = "capo" | "traitor" | "civilian";
 
-const ROLE_COUNTS: Record<Role, number> = {
-  capo: 2,
-  traitor: 4,
-  civilian: 12,
-};
+/** Scale role counts to the actual player count. */
+export function roleCountsFor(n: number): Record<Role, number> {
+  let capo = 2;
+  let traitor = 4;
+  if (n < 6) { capo = 1; traitor = 1; }
+  else if (n < 9) { capo = 1; traitor = 2; }
+  else if (n < 12) { capo = 1; traitor = 3; }
+  else if (n < 15) { capo = 2; traitor = 3; }
+  // 15+ keeps 2/4
+  capo = Math.min(capo, n);
+  traitor = Math.min(traitor, Math.max(0, n - capo));
+  const civilian = Math.max(0, n - capo - traitor);
+  return { capo, traitor, civilian };
+}
 
 function shuffle<T>(arr: T[]): T[] {
   const a = [...arr];
@@ -26,16 +35,11 @@ export function assignRoles(
   playerIds: string[],
   lastRoles: Record<string, Role | undefined>,
 ): Record<string, Role> {
-  const total = ROLE_COUNTS.capo + ROLE_COUNTS.traitor + ROLE_COUNTS.civilian;
-  if (playerIds.length !== total) {
-    // For non-18 player counts, scale civilians.
-    ROLE_COUNTS.civilian = Math.max(0, playerIds.length - ROLE_COUNTS.capo - ROLE_COUNTS.traitor);
-  }
-
+  const counts = roleCountsFor(playerIds.length);
   const roleSlots: Role[] = [
-    ...Array(ROLE_COUNTS.capo).fill("capo"),
-    ...Array(ROLE_COUNTS.traitor).fill("traitor"),
-    ...Array(ROLE_COUNTS.civilian).fill("civilian"),
+    ...Array(counts.capo).fill("capo"),
+    ...Array(counts.traitor).fill("traitor"),
+    ...Array(counts.civilian).fill("civilian"),
   ];
 
   for (let attempt = 0; attempt < 200; attempt++) {
