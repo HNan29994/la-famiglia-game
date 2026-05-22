@@ -195,6 +195,11 @@ function AdminConsole({ gameId, onReset }: { gameId: string; onReset: () => void
           </div>
           <div className="text-xs font-serif italic text-muted-foreground mt-1">{event.description}</div>
         </div>
+        {players.length > 0 && players.length < 18 && (
+          <div className="mt-3 text-[10px] tracking-widest uppercase text-[var(--blood)]/80 font-display text-center">
+            Test mode · {players.length} players · roles scaled
+          </div>
+        )}
       </div>
 
       <div className="mt-6 space-y-2">
