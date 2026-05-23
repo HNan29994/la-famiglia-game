@@ -28,6 +28,8 @@ function PlayerView() {
   const [myVotes, setMyVotes] = useState<any[]>([]);
   const [revealed, setRevealed] = useState(false);
   const [murders, setMurders] = useState<any[]>([]);
+  const [traitorAssignments, setTraitorAssignments] = useState<any[]>([]);
+  const [giuros, setGiuros] = useState<any[]>([]);
 
   async function refresh() {
     const { data: p } = await supabase.from("players").select("*").eq("id", playerId).single();
@@ -40,6 +42,8 @@ function PlayerView() {
     if (g) {
       const { data: a } = await supabase.from("role_assignments").select("*").eq("game_id", p.game_id).eq("night", g.current_night).eq("player_id", playerId).maybeSingle();
       setAssignment(a);
+      const { data: ta } = await supabase.from("role_assignments").select("player_id, role").eq("game_id", p.game_id).eq("night", g.current_night).eq("role", "traitor");
+      setTraitorAssignments(ta || []);
       const { data: tip } = await supabase.from("suspect_tips").select("*").eq("game_id", p.game_id).eq("night", g.current_night).eq("capo_id", playerId).maybeSingle();
       setSuspectTip(tip?.suspect_ids ?? null);
       const { data: ar } = await supabase.from("arrests").select("*").eq("game_id", p.game_id).eq("night", g.current_night).eq("capo_id", playerId).maybeSingle();
@@ -52,6 +56,8 @@ function PlayerView() {
       setMyVotes(v || []);
       const { data: m } = await supabase.from("murders").select("*").eq("game_id", p.game_id).eq("night", g.current_night);
       setMurders(m || []);
+      const { data: gq } = await supabase.from("giuros").select("*").eq("game_id", p.game_id).order("created_at", { ascending: false });
+      setGiuros(gq || []);
     }
   }
 
@@ -87,6 +93,17 @@ function PlayerView() {
     <div className="min-h-screen px-5 max-w-md mx-auto pb-20">
       <AppHeader subtitle={`Welcome, ${player.name}`} />
 
+      {game.current_night === 3 && (
+        <ArmoryBanner name={game.night3_game_name} />
+      )}
+
+      {/* Incoming Giuro — must answer before doing anything else */}
+      <PendingGiuroAnswer
+        giuros={giuros}
+        meId={playerId}
+        allPlayers={allPlayers}
+      />
+
       {game.phase === "setup" && (
         <EmptyState text={`Notte ${game.current_night} has not yet begun. Tap ready when the family is ready to start.`} />
       )}
@@ -94,7 +111,15 @@ function PlayerView() {
       {assignment && (game.phase === "night_active" || game.phase.startsWith("tribunale_")) && (
         <>
           <RoleReveal assignment={assignment} revealed={revealed} onReveal={() => setRevealed(true)} />
-          {revealed && (
+          {revealed && assignment.role === "traitor" && !assignment.traitor_list_seen && (
+            <TraitorListOverlay
+              assignment={assignment}
+              traitorAssignments={traitorAssignments}
+              allPlayers={allPlayers}
+              meId={playerId}
+            />
+          )}
+          {revealed && (assignment.role !== "traitor" || assignment.traitor_list_seen) && (
             <>
               <MissionsCard
                 assignment={assignment}
@@ -129,6 +154,15 @@ function PlayerView() {
                   myAlliance={myAlliance}
                   incoming={incomingAlliance}
                   refresh={refresh}
+                />
+              )}
+              {game.phase === "tribunale_discussion" && (
+                <GiuroCard
+                  gameId={game.id}
+                  night={game.current_night}
+                  me={player}
+                  allPlayers={allPlayers}
+                  giuros={giuros}
                 />
               )}
               {game.phase === "tribunale_voting" && (
