@@ -176,6 +176,7 @@ export type Database = {
           current_night: number
           id: string
           name: string
+          night3_game_name: string
           phase: Database["public"]["Enums"]["game_phase"]
         }
         Insert: {
@@ -183,6 +184,7 @@ export type Database = {
           current_night?: number
           id?: string
           name?: string
+          night3_game_name?: string
           phase?: Database["public"]["Enums"]["game_phase"]
         }
         Update: {
@@ -190,7 +192,44 @@ export type Database = {
           current_night?: number
           id?: string
           name?: string
+          night3_game_name?: string
           phase?: Database["public"]["Enums"]["game_phase"]
+        }
+        Relationships: []
+      }
+      giuros: {
+        Row: {
+          answer: string | null
+          answered_at: string | null
+          asker_id: string
+          created_at: string
+          game_id: string
+          id: string
+          night: number
+          question: string
+          target_id: string
+        }
+        Insert: {
+          answer?: string | null
+          answered_at?: string | null
+          asker_id: string
+          created_at?: string
+          game_id: string
+          id?: string
+          night: number
+          question: string
+          target_id: string
+        }
+        Update: {
+          answer?: string | null
+          answered_at?: string | null
+          asker_id?: string
+          created_at?: string
+          game_id?: string
+          id?: string
+          night?: number
+          question?: string
+          target_id?: string
         }
         Relationships: []
       }
@@ -273,6 +312,7 @@ export type Database = {
         Row: {
           created_at: string
           game_id: string
+          giuro_used: boolean
           id: string
           name: string
           pin: string | null
@@ -281,6 +321,7 @@ export type Database = {
         Insert: {
           created_at?: string
           game_id: string
+          giuro_used?: boolean
           id?: string
           name: string
           pin?: string | null
@@ -289,6 +330,7 @@ export type Database = {
         Update: {
           created_at?: string
           game_id?: string
+          giuro_used?: boolean
           id?: string
           name?: string
           pin?: string | null
@@ -322,6 +364,7 @@ export type Database = {
           night_points: number
           player_id: string
           role: Database["public"]["Enums"]["player_role"]
+          traitor_list_seen: boolean
         }
         Insert: {
           bonus_mission?: string | null
@@ -340,6 +383,7 @@ export type Database = {
           night_points?: number
           player_id: string
           role: Database["public"]["Enums"]["player_role"]
+          traitor_list_seen?: boolean
         }
         Update: {
           bonus_mission?: string | null
@@ -358,6 +402,7 @@ export type Database = {
           night_points?: number
           player_id?: string
           role?: Database["public"]["Enums"]["player_role"]
+          traitor_list_seen?: boolean
         }
         Relationships: [
           {
