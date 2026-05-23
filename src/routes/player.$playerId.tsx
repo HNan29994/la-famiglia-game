@@ -539,9 +539,262 @@ function Leaderboard({ players, meId }: { players: any[]; meId: string }) {
               <span className="font-display text-gold/70 text-xs w-5">{String(i + 1).padStart(2, "0")}</span>
               <span className="font-serif">{p.name}</span>
             </div>
-            <span className="font-display text-gold text-sm">{p.total_points}</span>
+            <div className="flex items-center gap-3">
+              <span className={`text-[9px] tracking-widest uppercase ${p.giuro_used ? "text-[var(--blood)]/70" : "text-gold/70"}`}>
+                Giuro · {p.giuro_used ? "Used" : "Avail."}
+              </span>
+              <span className="font-display text-gold text-sm">{p.total_points}</span>
+            </div>
           </div>
         ))}
+      </div>
+    </div>
+  );
+}
+
+function ArmoryBanner({ name }: { name: string }) {
+  return (
+    <div className="mt-4 bg-card border border-gold rounded-sm p-4 text-center">
+      <div className="text-[10px] tracking-[0.4em] uppercase text-gold mb-1">
+        Night 3 · To Be Confirmed
+      </div>
+      <div className="font-display text-xl text-shimmer">{name || "TBC — To be decided by the group."}</div>
+      <div className="mt-2 text-[10px] tracking-widest uppercase text-muted-foreground/80 italic">
+        Editable from the lobby before Night 3 begins.
+      </div>
+    </div>
+  );
+}
+
+function TraitorListOverlay({
+  assignment,
+  traitorAssignments,
+  allPlayers,
+  meId,
+}: {
+  assignment: any;
+  traitorAssignments: { player_id: string; role: string }[];
+  allPlayers: any[];
+  meId: string;
+}) {
+  const others = traitorAssignments
+    .filter((t) => t.player_id !== meId)
+    .map((t) => allPlayers.find((p) => p.id === t.player_id)?.name)
+    .filter(Boolean);
+
+  async function dismiss() {
+    const { error } = await supabase
+      .from("role_assignments")
+      .update({ traitor_list_seen: true } as any)
+      .eq("id", assignment.id);
+    if (error) toast.error(error.message);
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-sm flex items-center justify-center px-5">
+      <div className="w-full max-w-md bg-gradient-to-b from-card to-[var(--ink)] border border-[var(--blood)] rounded-sm p-6 shadow-dramatic animate-reveal">
+        <div className="text-center text-4xl mb-2">🐍</div>
+        <div className="text-center font-display text-sm tracking-[0.4em] uppercase text-[var(--blood)] mb-4">
+          La Famiglia Segreta
+        </div>
+        <div className="text-center font-serif italic text-muted-foreground mb-4 text-sm">
+          Your fellow Traditori for the whole trip:
+        </div>
+        {others.length === 0 ? (
+          <div className="text-center font-serif italic text-muted-foreground">
+            You are the lone snake tonight.
+          </div>
+        ) : (
+          <div className="space-y-1">
+            {others.map((n) => (
+              <div
+                key={n as string}
+                className="text-center font-display tracking-[0.3em] uppercase text-xl text-[var(--blood)] py-2 border-b border-[var(--blood)]/20"
+              >
+                {n as string}
+              </div>
+            ))}
+          </div>
+        )}
+        <div className="mt-5 bg-[var(--blood)]/20 border border-[var(--blood)]/50 rounded-sm p-3 text-center">
+          <div className="font-display text-xs tracking-widest uppercase text-[var(--blood)]">
+            📸 Screenshot this
+          </div>
+          <div className="text-xs font-serif italic text-muted-foreground mt-1">
+            You will not see this list again.
+          </div>
+        </div>
+        <button
+          onClick={dismiss}
+          className="mt-5 w-full font-display tracking-widest text-sm uppercase bg-gradient-gold text-primary-foreground py-4 rounded-sm shadow-gold"
+        >
+          I have memorised them
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function GiuroCard({
+  gameId,
+  night,
+  me,
+  allPlayers,
+  giuros,
+}: {
+  gameId: string;
+  night: number;
+  me: any;
+  allPlayers: any[];
+  giuros: any[];
+}) {
+  const [open, setOpen] = useState(false);
+  const [target, setTarget] = useState("");
+  const [question, setQuestion] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  const myGiuros = giuros.filter((g) => g.asker_id === me.id);
+  const used = me.giuro_used || myGiuros.length > 0;
+
+  async function submit() {
+    const q = question.trim();
+    if (!target || !q) return;
+    setSubmitting(true);
+    const { error: insErr } = await supabase.from("giuros").insert({
+      game_id: gameId,
+      night,
+      asker_id: me.id,
+      target_id: target,
+      question: q,
+    });
+    if (insErr) {
+      setSubmitting(false);
+      toast.error(insErr.message);
+      return;
+    }
+    await supabase.from("players").update({ giuro_used: true } as any).eq("id", me.id);
+    setSubmitting(false);
+    setOpen(false);
+    setTarget("");
+    setQuestion("");
+    toast.success("Giuro sworn. Await the answer.");
+  }
+
+  return (
+    <div className="mt-6 bg-card border border-gold rounded-sm p-4">
+      <div className="text-[10px] tracking-widest uppercase text-gold mb-2">
+        Giuro sulla Famiglia · One use per trip
+      </div>
+      <div className="font-serif text-sm italic text-muted-foreground mb-3">
+        Swear on the family and force any player to answer one yes/no question publicly.
+      </div>
+      {used ? (
+        <div className="text-center text-xs font-display tracking-widest uppercase text-[var(--blood)] py-2">
+          You have used your Giuro
+        </div>
+      ) : !open ? (
+        <button
+          onClick={() => setOpen(true)}
+          className="w-full font-display tracking-widest text-xs uppercase bg-gradient-gold text-primary-foreground py-3 rounded-sm shadow-gold"
+        >
+          ⚖ Giuro sulla Famiglia
+        </button>
+      ) : (
+        <div className="space-y-3">
+          <select
+            value={target}
+            onChange={(e) => setTarget(e.target.value)}
+            className="w-full bg-input border border-[var(--gold)]/30 rounded-sm py-2 px-3 font-serif text-sm"
+          >
+            <option value="">Choose your target…</option>
+            {allPlayers.filter((p) => p.id !== me.id).map((p) => (
+              <option key={p.id} value={p.id}>{p.name}</option>
+            ))}
+          </select>
+          <textarea
+            value={question}
+            onChange={(e) => setQuestion(e.target.value)}
+            placeholder="Yes / no question only…"
+            rows={3}
+            maxLength={200}
+            className="w-full bg-input border border-[var(--gold)]/30 rounded-sm py-2 px-3 font-serif text-sm"
+          />
+          <div className="flex gap-2">
+            <button
+              onClick={submit}
+              disabled={!target || !question.trim() || submitting}
+              className="flex-1 font-display tracking-widest text-xs uppercase bg-gradient-gold text-primary-foreground py-3 rounded-sm disabled:opacity-40"
+            >
+              {submitting ? "…" : "Swear it"}
+            </button>
+            <button
+              onClick={() => setOpen(false)}
+              className="flex-1 font-display tracking-widest text-xs uppercase border border-[var(--gold)]/30 text-gold py-3 rounded-sm"
+            >
+              Cancel
+            </button>
+          </div>
+          <div className="text-[10px] tracking-widest uppercase text-muted-foreground/70 text-center">
+            The answer will be shown to everyone at Il Tribunale.
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PendingGiuroAnswer({
+  giuros,
+  meId,
+  allPlayers,
+}: {
+  giuros: any[];
+  meId: string;
+  allPlayers: any[];
+}) {
+  const pending = giuros.find((g) => g.target_id === meId && !g.answer);
+  if (!pending) return null;
+  const askerName = allPlayers.find((p) => p.id === pending.asker_id)?.name || "Someone";
+
+  async function answer(value: "Sì" | "No") {
+    const { error } = await supabase
+      .from("giuros")
+      .update({ answer: value, answered_at: new Date().toISOString() } as any)
+      .eq("id", pending.id);
+    if (error) toast.error(error.message);
+    else toast.success(`Answered: ${value}`);
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-sm flex items-center justify-center px-5">
+      <div className="w-full max-w-md bg-gradient-to-b from-card to-[var(--ink)] border border-gold rounded-sm p-6 shadow-dramatic animate-reveal">
+        <div className="text-center text-4xl mb-2">⚖</div>
+        <div className="text-center font-display text-sm tracking-[0.4em] uppercase text-gold mb-3">
+          Giuro sulla Famiglia
+        </div>
+        <div className="text-center text-xs font-serif italic text-muted-foreground mb-4">
+          {askerName} demands an answer on the family.
+        </div>
+        <div className="bg-card border border-[var(--gold)]/30 rounded-sm p-4 font-serif text-base text-foreground text-center">
+          {pending.question}
+        </div>
+        <div className="mt-5 flex gap-3">
+          <button
+            onClick={() => answer("Sì")}
+            className="flex-1 font-display tracking-widest text-sm uppercase bg-gradient-gold text-primary-foreground py-4 rounded-sm shadow-gold"
+          >
+            Sì
+          </button>
+          <button
+            onClick={() => answer("No")}
+            className="flex-1 font-display tracking-widest text-sm uppercase border border-[var(--blood)] text-[var(--blood)] py-4 rounded-sm"
+          >
+            No
+          </button>
+        </div>
+        <div className="mt-3 text-center text-[10px] tracking-widest uppercase text-muted-foreground/70">
+          Your answer will be shown to all players.
+        </div>
       </div>
     </div>
   );
