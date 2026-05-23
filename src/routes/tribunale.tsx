@@ -23,6 +23,7 @@ function TribunalePage() {
   const [votes, setVotes] = useState<any[]>([]);
   const [timer, setTimer] = useState(180);
   const [murders, setMurders] = useState<any[]>([]);
+  const [giuros, setGiuros] = useState<any[]>([]);
 
   useEffect(() => {
     const id = getStoredGameId();
@@ -44,6 +45,8 @@ function TribunalePage() {
       setVotes(v || []);
       const { data: m } = await supabase.from("murders").select("*").eq("game_id", id).eq("night", g.current_night);
       setMurders(m || []);
+      const { data: gq } = await supabase.from("giuros").select("*").eq("game_id", id).order("created_at", { ascending: true });
+      setGiuros(gq || []);
     }
   }
 
@@ -95,6 +98,17 @@ function TribunalePage() {
         Shared screen · phases advance when a majority of players tap ready on their phones
       </div>
 
+      {game.current_night === 3 && (
+        <div className="mt-4 bg-card border border-gold rounded-sm p-4 text-center">
+          <div className="text-[10px] tracking-[0.4em] uppercase text-gold mb-1">
+            Night 3 · Armory · To Be Confirmed
+          </div>
+          <div className="font-display text-2xl text-shimmer">
+            {(game as any).night3_game_name || "TBC — To be decided by the group."}
+          </div>
+        </div>
+      )}
+
       {murders.length > 0 &&
         (game.phase === "tribunale_reveal" ||
           game.phase === "tribunale_leaderboard" ||
@@ -110,7 +124,10 @@ function TribunalePage() {
         <ArrestsReveal arrests={arrests} playerById={playerById} />
       )}
       {game.phase === "tribunale_discussion" && (
-        <DiscussionPhase timer={timer} />
+        <>
+          <DiscussionPhase timer={timer} />
+          <GiuroBoard giuros={giuros} playerById={playerById} />
+        </>
       )}
       {game.phase === "tribunale_voting" && (
         <VotingPhase players={players} votes={votes} />
@@ -402,6 +419,40 @@ function DeceasedReveal({ murders, playerById }: { murders: any[]; playerById: R
       </div>
       <div className="mt-3 text-center text-xs font-serif italic text-muted-foreground">
         Pour. Drink. Carry on. The assassins remain hidden.
+      </div>
+    </div>
+  );
+}
+
+function GiuroBoard({ giuros, playerById }: { giuros: any[]; playerById: Record<string, any> }) {
+  if (!giuros || giuros.length === 0) return null;
+  return (
+    <div className="mt-6 bg-card border border-gold rounded-sm p-5">
+      <div className="text-center text-[10px] tracking-[0.4em] uppercase text-gold mb-3">
+        ⚖ Giuri sulla Famiglia
+      </div>
+      <div className="space-y-3">
+        {giuros.map((g) => {
+          const asker = playerById[g.asker_id]?.name;
+          const target = playerById[g.target_id]?.name;
+          return (
+            <div key={g.id} className="border border-[var(--gold)]/30 rounded-sm p-3">
+              <div className="text-[10px] tracking-widest uppercase text-gold/80">
+                {asker} → {target}
+              </div>
+              <div className="font-serif text-sm mt-1">"{g.question}"</div>
+              <div className="mt-2 text-right font-display tracking-widest text-sm uppercase">
+                {g.answer ? (
+                  <span className={g.answer === "Sì" ? "text-gold" : "text-[var(--blood)]"}>
+                    {target} says: {g.answer}
+                  </span>
+                ) : (
+                  <span className="text-muted-foreground italic">Awaiting answer…</span>
+                )}
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
