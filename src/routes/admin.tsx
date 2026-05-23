@@ -102,19 +102,41 @@ function NewGameSetup({ onCreated }: { onCreated: (id: string) => void }) {
 
 function LobbyView({ gameId, onReset }: { gameId: string; onReset: () => void }) {
   const [players, setPlayers] = useState<any[]>([]);
+  const [game, setGame] = useState<any>(null);
+  const [n3Name, setN3Name] = useState("");
+  const [savingN3, setSavingN3] = useState(false);
 
   useEffect(() => {
     let mounted = true;
     async function refresh() {
       const { data: p } = await supabase.from("players").select("*").eq("game_id", gameId).order("name");
       if (mounted) setPlayers(p || []);
+      const { data: g } = await supabase.from("games").select("*").eq("id", gameId).maybeSingle();
+      if (mounted && g) {
+        setGame(g);
+        setN3Name((g as any).night3_game_name ?? "");
+      }
     }
     refresh();
     const ch = supabase.channel(`lobby-${gameId}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "players" }, () => refresh())
+      .on("postgres_changes", { event: "*", schema: "public", table: "games" }, () => refresh())
       .subscribe();
     return () => { mounted = false; supabase.removeChannel(ch); };
   }, [gameId]);
+
+  async function saveN3() {
+    setSavingN3(true);
+    const { error } = await supabase
+      .from("games")
+      .update({ night3_game_name: n3Name.trim() || "TBC — To be decided by the group." } as any)
+      .eq("id", gameId);
+    setSavingN3(false);
+    if (error) toast.error(error.message);
+    else toast.success("Night 3 game saved");
+  }
+
+  const n3Locked = game && game.current_night >= 3 && game.phase !== "setup";
 
   return (
     <div className="min-h-screen px-5 max-w-md mx-auto pb-20">
@@ -137,13 +159,40 @@ function LobbyView({ gameId, onReset }: { gameId: string; onReset: () => void })
         Il Tribunale (shared screen)
       </Link>
 
+      <Ornament className="mt-10">NIGHT 3 · ARMORY GAME</Ornament>
+      <div className="mt-4 bg-card border border-[var(--gold)]/30 rounded-sm p-4">
+        <div className="text-[10px] tracking-widest uppercase text-gold/70 mb-2">
+          Game name (any player can edit before Night 3 begins)
+        </div>
+        <input
+          value={n3Name}
+          onChange={(e) => setN3Name(e.target.value)}
+          disabled={!!n3Locked}
+          placeholder="TBC — To be decided by the group."
+          className="w-full bg-input border border-[var(--gold)]/20 rounded-sm px-3 py-2 text-sm font-serif focus:border-gold focus:outline-none disabled:opacity-60"
+        />
+        <button
+          onClick={saveN3}
+          disabled={savingN3 || !!n3Locked}
+          className="mt-3 w-full font-display tracking-widest text-xs uppercase border border-gold text-gold py-2 rounded-sm disabled:opacity-40"
+        >
+          {savingN3 ? "Saving…" : n3Locked ? "Locked · Night 3 in progress" : "Save Night 3 Game"}
+        </button>
+        <div className="mt-2 text-[10px] tracking-widest uppercase text-muted-foreground/70 text-center">
+          Displayed on every player's screen during Notte 3.
+        </div>
+      </div>
+
       <Ornament className="mt-10">ROSTER</Ornament>
       <div className="mt-4 grid grid-cols-2 gap-2">
         {players.map((p) => (
           <div key={p.id} className="border border-[var(--gold)]/20 rounded-sm p-2 bg-card/60">
             <div className="font-serif text-sm">{p.name}</div>
-            <div className="text-[10px] tracking-widest uppercase text-muted-foreground">
-              {p.total_points}pt
+            <div className="text-[10px] tracking-widest uppercase text-muted-foreground flex justify-between">
+              <span>{p.total_points}pt</span>
+              <span className={p.giuro_used ? "text-[var(--blood)]" : "text-gold"}>
+                Giuro: {p.giuro_used ? "Used" : "Available"}
+              </span>
             </div>
           </div>
         ))}
