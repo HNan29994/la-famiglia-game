@@ -433,3 +433,82 @@ export function getStoredPlayerId(gameId: string): string | null {
 export function setStoredPlayerId(gameId: string, playerId: string) {
   localStorage.setItem(`famiglia_player_${gameId}`, playerId);
 }
+
+/**
+ * Reveal a single banished player's role and apply their delayed banishment
+ * vote points. Idempotent — guarded by `players.banished_revealed` and
+ * `votes.points_applied`.
+ * Returns the role and per-voter deltas (for UI display) or null if already revealed.
+ */
+export async function revealBanishedPlayer(
+  gameId: string,
+  playerId: string,
+): Promise<{ role: Role; deltas: { voter_id: string; delta: number }[] } | null> {
+  const { data: p } = await supabase
+    .from("players")
+    .select("banished, banished_night, banished_revealed")
+    .eq("id", playerId)
+    .single();
+  if (!p || !p.banished || p.banished_revealed) return null;
+
+  const { data: ra } = await supabase
+    .from("role_assignments")
+    .select("role")
+    .eq("game_id", gameId)
+    .eq("player_id", playerId)
+    .eq("night", p.banished_night as number)
+    .maybeSingle();
+  if (!ra) return null;
+  const role = ra.role as Role;
+  // Traitor banishment rewards voters (+2). Faithful/Capo banishment costs voters (-1).
+  const delta = role === "traitor" ? 2 : -1;
+  const correct = role === "traitor";
+
+  const { data: votes } = await supabase
+    .from("votes")
+    .select("id, voter_id")
+    .eq("game_id", gameId)
+    .eq("target_id", playerId)
+    .eq("points_applied", false);
+
+  const deltas: { voter_id: string; delta: number }[] = [];
+  for (const v of votes || []) {
+    // Atomic claim — only one client gets the row.
+    const { data: claimed } = await supabase
+      .from("votes")
+      .update({ was_correct: correct, points_applied: true } as any)
+      .eq("id", v.id)
+      .eq("points_applied", false)
+      .select("id");
+    if (claimed && claimed.length > 0) {
+      const { data: voter } = await supabase
+        .from("players")
+        .select("total_points")
+        .eq("id", v.voter_id)
+        .single();
+      const newTotal = (voter?.total_points || 0) + delta;
+      await supabase.from("players").update({ total_points: newTotal }).eq("id", v.voter_id);
+      deltas.push({ voter_id: v.voter_id, delta });
+    }
+  }
+
+  await supabase
+    .from("players")
+    .update({ banished_revealed: true } as any)
+    .eq("id", playerId)
+    .eq("banished_revealed", false);
+
+  return { role, deltas };
+}
+
+/** Returns ordered list of banished players awaiting reveal. */
+export async function getBanishedOrder(gameId: string) {
+  const { data } = await supabase
+    .from("players")
+    .select("id, name, banished_night, banished_revealed")
+    .eq("game_id", gameId)
+    .eq("banished", true)
+    .order("banished_night", { ascending: true })
+    .order("name", { ascending: true });
+  return data || [];
+}
