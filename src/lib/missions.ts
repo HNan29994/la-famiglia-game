@@ -10,14 +10,14 @@ export const CIVILIAN_MISSIONS = [
 ];
 
 export const TRAITOR_MISSIONS = [
-  "Get a Civilian to do a dare without them realising it's a mission",
+  "Get one of Il Fideli to do a dare without them realising it's a mission",
   "Convince someone to switch their alliance partner",
   "Say 'la famiglia' out loud in a group of 5+ without anyone calling it out",
   "Get a Capo to suspect the wrong person (verbally)",
   "Shake hands formally with every other traitor without anyone noticing",
   "Get someone to agree to vote for a specific person tonight",
   "Plant a wine glass at someone else's seat without being noticed",
-  "Whisper a fake secret to two different civilians",
+  "Whisper a fake secret to two different Il Fideli",
 ];
 
 export const CAPO_MISSIONS = [
@@ -26,7 +26,7 @@ export const CAPO_MISSIONS = [
   "Correctly guess all 4 traitors before Il Tribunale",
   "Form an alliance with a traitor without knowing they're a traitor",
   "Confirm your suspect tip by gathering evidence from 2 other players",
-  "Warn a Civilian that they're being targeted, correctly",
+  "Warn one of Il Fideli that they're being targeted, correctly",
   "Interrogate 3 different players using only one question each",
   "Get a confession by offering immunity (you can't actually grant it)",
 ];
@@ -34,7 +34,7 @@ export const CAPO_MISSIONS = [
 export const SPECIAL_EVENTS: Record<number, { emoji: string; name: string; description: string }> = {
   1: { emoji: "🃏", name: "Benvenuti", description: "Standard rules apply. Welcome to the family." },
   2: { emoji: "👁️", name: "Il Traditore Doppio", description: "One traitor was secretly a Capo — revealed at the vote." },
-  3: { emoji: "🔥", name: "La Resa dei Conti", description: "Points doubled tonight. If not all 4 traitors are voted out, civilians lose drink distribution rights." },
+  3: { emoji: "🔥", name: "La Resa dei Conti", description: "Points doubled tonight. If not all 4 traitors are voted out, Il Fideli lose drink distribution rights." },
 };
 
 export function missionsForRole(role: "capo" | "traitor" | "civilian"): string[] {
