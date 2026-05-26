@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { AppHeader } from "@/components/AppHeader";
 import { Ornament } from "@/components/Ornament";
 import { getStoredGameId } from "@/lib/game";
+import { revealBanishedPlayer, getBanishedOrder } from "@/lib/game";
 import { SPECIAL_EVENTS } from "@/lib/missions";
 import { roleMeta } from "@/components/RoleBadge";
 import type { Role } from "@/lib/game";
@@ -128,6 +129,9 @@ function TribunalePage() {
           <DiscussionPhase timer={timer} />
           <GiuroBoard giuros={giuros} playerById={playerById} />
         </>
+      )}
+      {game.phase === "great_reveal" && (
+        <GreatRevealEngine gameId={gameId} playerById={playerById} />
       )}
       {game.phase === "tribunale_voting" && (
         <VotingPhase players={players} votes={votes} />
