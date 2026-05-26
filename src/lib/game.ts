@@ -70,7 +70,7 @@ export async function beginNight(gameId: string, night: number) {
   // Fetch players
   const { data: players, error: pErr } = await supabase
     .from("players")
-    .select("id")
+    .select("id, name, banished")
     .eq("game_id", gameId);
   if (pErr) throw pErr;
   if (!players || players.length === 0) throw new Error("No players in game");
@@ -86,7 +86,9 @@ export async function beginNight(gameId: string, night: number) {
     prev?.forEach((r: any) => (lastRoles[r.player_id] = r.role));
   }
 
-  const ids = players.map((p) => p.id);
+  const activePlayers = (players as any[]).filter((p) => !p.banished);
+  const ids = activePlayers.map((p) => p.id);
+  if (ids.length === 0) throw new Error("All players are banished");
   const assignment = assignRoles(ids, lastRoles);
 
   // Delete any existing assignments for this night (in case of re-roll)
@@ -97,7 +99,7 @@ export async function beginNight(gameId: string, night: number) {
   const traitorIds = ids.filter((id) => assignment[id] === "traitor");
   const nonTraitorIds = ids.filter((id) => assignment[id] !== "traitor");
   const playerNames: Record<string, string> = {};
-  (players as any[]).forEach((p: any) => (playerNames[p.id] = p.name));
+  activePlayers.forEach((p: any) => (playerNames[p.id] = p.name));
 
   const rows = ids.map((pid) => {
     const role = assignment[pid];
@@ -220,12 +222,6 @@ export async function scoreNight(gameId: string, night: number) {
     ) {
       pts += 4;
     }
-    // Civilian correctly voted for a traitor
-    if (a.role === "civilian") {
-      const myVotes = votes?.filter((v: any) => v.voter_id === a.player_id) || [];
-      const correct = myVotes.filter((v: any) => roleByPlayer[v.target_id] === "traitor").length;
-      pts += correct;
-    }
     pointsByPlayer[a.player_id] = pts;
   }
 
@@ -272,6 +268,15 @@ export async function scoreNight(gameId: string, night: number) {
   });
   for (const [pid, total] of Object.entries(totals)) {
     await supabase.from("players").update({ total_points: total }).eq("id", pid);
+  }
+
+  // Mark voted-out players as banished (role stays hidden — revealed at Great Reveal)
+  for (const id of votedOut) {
+    await supabase
+      .from("players")
+      .update({ banished: true, banished_night: night } as any)
+      .eq("id", id)
+      .eq("banished", false);
   }
 }
 
