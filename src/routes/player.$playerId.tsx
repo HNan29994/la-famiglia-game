@@ -837,3 +837,138 @@ function PendingGiuroAnswer({
     </div>
   );
 }
+function BanishedCard({ player }: { player: any }) {
+  return (
+    <div className="mt-6 bg-gradient-to-b from-[var(--blood)]/20 to-[var(--ink)] border border-[var(--blood)] rounded-sm p-8 text-center shadow-dramatic animate-reveal">
+      <div className="text-6xl mb-3">🔒</div>
+      <div className="font-display text-3xl tracking-[0.3em] uppercase text-[var(--blood)] text-shadow-gold">
+        Sei stato bandito
+      </div>
+      <div className="mt-3 text-sm font-serif italic text-muted-foreground">
+        You have been banished from La Famiglia
+        {player.banished_night ? ` on Notte ${player.banished_night}` : ""}.
+      </div>
+      <div className="mt-4 text-[10px] tracking-widest uppercase text-muted-foreground/70">
+        Your role is sealed — none shall know until The Great Reveal.
+      </div>
+    </div>
+  );
+}
+
+function IlSilenzioCard() {
+  return (
+    <div className="mt-4 bg-card border border-gold rounded-sm p-5">
+      <div className="text-center text-[10px] tracking-[0.4em] uppercase text-gold mb-2">
+        ⚖ Il Silenzio
+      </div>
+      <div className="font-serif italic text-sm leading-relaxed text-foreground/90 text-center">
+        A banished soul may lie, deflect, or stay silent — but must never
+        confirm their true role. Breaking Il Silenzio breaks the family.
+      </div>
+      <div className="mt-3 text-[10px] tracking-widest uppercase text-muted-foreground/70 text-center">
+        Your Giuro sulla Famiglia is sealed shut.
+      </div>
+    </div>
+  );
+}
+
+function GreatRevealMirror({ gameId, allPlayers }: { gameId: string; allPlayers: any[] }) {
+  const [banished, setBanished] = useState<any[]>([]);
+  const [roles, setRoles] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    let mounted = true;
+    async function refresh() {
+      const order = await getBanishedOrder(gameId);
+      if (mounted) setBanished(order);
+      // Fetch revealed roles only for already-revealed players
+      const revealedIds = order.filter((p: any) => p.banished_revealed).map((p: any) => p.id);
+      if (revealedIds.length > 0) {
+        const { data } = await supabase
+          .from("role_assignments")
+          .select("player_id, role, night")
+          .eq("game_id", gameId)
+          .in("player_id", revealedIds);
+        const map: Record<string, string> = {};
+        const byPlayer: Record<string, any[]> = {};
+        (data || []).forEach((r: any) => {
+          (byPlayer[r.player_id] ||= []).push(r);
+        });
+        for (const p of order) {
+          if (!p.banished_revealed) continue;
+          const rs = byPlayer[p.id] || [];
+          const ra = rs.find((r) => r.night === p.banished_night);
+          if (ra) map[p.id] = ra.role;
+        }
+        if (mounted) setRoles(map);
+      }
+    }
+    refresh();
+    const ch = supabase
+      .channel(`great-reveal-mirror-${gameId}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "players" }, () => refresh())
+      .subscribe();
+    return () => { mounted = false; supabase.removeChannel(ch); };
+  }, [gameId]);
+
+  if (banished.length === 0) {
+    return (
+      <div className="mt-6 bg-card border border-gold rounded-sm p-6 text-center">
+        <div className="font-display text-sm tracking-[0.4em] uppercase text-gold">The Great Reveal</div>
+        <div className="mt-2 font-serif italic text-muted-foreground text-sm">
+          No souls were banished. La Famiglia stands whole.
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-6 bg-gradient-to-b from-card to-[var(--ink)] border border-gold rounded-sm p-5 shadow-dramatic">
+      <div className="text-center font-display text-sm tracking-[0.4em] uppercase text-gold mb-4">
+        ⚜ The Great Reveal ⚜
+      </div>
+      <div className="space-y-2">
+        {banished.map((p) => {
+          const revealed = p.banished_revealed;
+          const role = roles[p.id];
+          return (
+            <div
+              key={p.id}
+              className={`flex justify-between items-center border-b border-[var(--gold)]/15 py-2 px-2 ${revealed ? "animate-reveal" : "opacity-50"}`}
+            >
+              <span className="font-serif">{p.name}</span>
+              {revealed && role ? (
+                <span className={`font-display tracking-widest text-sm uppercase ${roleColor(role)}`}>
+                  {roleEmoji(role)} {roleItalian(role)}
+                </span>
+              ) : (
+                <span className="font-display text-xs tracking-widest uppercase text-muted-foreground">
+                  🔒 Sealed
+                </span>
+              )}
+            </div>
+          );
+        })}
+      </div>
+      <div className="mt-3 text-center text-[10px] tracking-widest uppercase text-muted-foreground/70 italic">
+        Watch the shared screen — points are applied as each soul is unmasked.
+      </div>
+    </div>
+  );
+}
+
+function roleColor(r: string) {
+  if (r === "traitor") return "text-[var(--blood)]";
+  if (r === "capo") return "text-gold";
+  return "text-muted-foreground";
+}
+function roleEmoji(r: string) {
+  if (r === "traitor") return "🐍";
+  if (r === "capo") return "🔫";
+  return "👤";
+}
+function roleItalian(r: string) {
+  if (r === "traitor") return "Il Traditore";
+  if (r === "capo") return "Il Capo";
+  return "Il Fideli";
+}
