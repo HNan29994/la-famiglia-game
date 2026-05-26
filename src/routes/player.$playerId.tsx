@@ -598,7 +598,7 @@ function TraitorListOverlay({
           La Famiglia Segreta
         </div>
         <div className="text-center font-serif italic text-muted-foreground mb-4 text-sm">
-          Your fellow Traditori for the whole trip:
+          Your fellow Il Traditori for the whole trip:
         </div>
         {others.length === 0 ? (
           <div className="text-center font-serif italic text-muted-foreground">
