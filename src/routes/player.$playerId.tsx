@@ -569,7 +569,11 @@ function Leaderboard({ players, meId }: { players: any[]; meId: string }) {
           <div key={p.id} className={`flex justify-between items-center py-2 px-3 rounded-sm ${p.id === meId ? "bg-[var(--gold)]/15 border border-gold" : "border-b border-[var(--gold)]/10"}`}>
             <div className="flex items-center gap-3">
               <span className="font-display text-gold/70 text-xs w-5">{String(i + 1).padStart(2, "0")}</span>
-              <span className="font-serif">{p.name}</span>
+              <span className="font-serif">
+                {p.banished && <span className="mr-1">🔒</span>}
+                {p.name}
+                {p.banished && <span className="ml-2 text-[10px] tracking-widest uppercase text-[var(--blood)]/80">Bandito</span>}
+              </span>
             </div>
             <div className="flex items-center gap-3">
               <span className={`text-[9px] tracking-widest uppercase ${p.giuro_used ? "text-[var(--blood)]/70" : "text-gold/70"}`}>
