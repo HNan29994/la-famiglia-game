@@ -107,8 +107,9 @@ export async function beginNight(gameId: string, night: number) {
     let bonus_mission: string | null = null;
     let bonus_target_id: string | null = null;
     if (role === "traitor" && nonTraitorIds.length > 0) {
-      bonus_target_id = nonTraitorIds[Math.floor(Math.random() * nonTraitorIds.length)];
-      bonus_mission = `Eliminate ${playerNames[bonus_target_id]} — get them to take a long drink without revealing yourself.`;
+      const tgt = nonTraitorIds[Math.floor(Math.random() * nonTraitorIds.length)];
+      bonus_target_id = tgt;
+      bonus_mission = `Eliminate ${playerNames[tgt]} — get them to take a long drink without revealing yourself.`;
     }
     return {
       game_id: gameId,
