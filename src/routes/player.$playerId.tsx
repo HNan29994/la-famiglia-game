@@ -82,12 +82,39 @@ function PlayerView() {
     night_active: "Ready for Il Tribunale",
     tribunale_missions: "Continue · Reveal arrests",
     tribunale_arrests: "Continue · Open discussion",
-    tribunale_discussion: "Open the vote",
+    tribunale_discussion: game.current_night === 3 ? "Begin The Great Reveal" : "Open the vote",
+    great_reveal: "Open the final vote",
     tribunale_voting: "I've voted",
     tribunale_reveal: "Continue · Tally scores",
     tribunale_leaderboard: "Continue · Pour drinks",
     tribunale_drinks: game.current_night >= 3 ? "End trip · Crown Padrino" : `Advance to Notte ${game.current_night + 1}`,
   };
+
+  // Banished players see a single locked-out view + Il Silenzio. They never
+  // see their old role, get no new role, and cannot Giuro.
+  if (player.banished) {
+    return (
+      <div className="min-h-screen px-5 max-w-md mx-auto pb-20">
+        <AppHeader subtitle={`${player.name}`} />
+        <BanishedCard player={player} />
+        <IlSilenzioCard />
+        {game.phase === "great_reveal" && (
+          <GreatRevealMirror gameId={game.id} allPlayers={allPlayers} />
+        )}
+        <Leaderboard players={allPlayers} meId={playerId} />
+        {game.phase !== "finished" && readyLabel[game.phase] && (
+          <ReadyButton
+            gameId={game.id}
+            playerId={playerId}
+            night={game.current_night}
+            phase={game.phase}
+            label={readyLabel[game.phase]}
+            playerCount={allPlayers.length}
+          />
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen px-5 max-w-md mx-auto pb-20">
@@ -103,6 +130,10 @@ function PlayerView() {
         meId={playerId}
         allPlayers={allPlayers}
       />
+
+      {game.phase === "great_reveal" && (
+        <GreatRevealMirror gameId={game.id} allPlayers={allPlayers} />
+      )}
 
       {game.phase === "setup" && (
         <EmptyState text={`Notte ${game.current_night} has not yet begun. Tap ready when the family is ready to start.`} />
