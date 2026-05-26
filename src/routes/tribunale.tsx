@@ -467,3 +467,101 @@ function GiuroBoard({ giuros, playerById }: { giuros: any[]; playerById: Record<
     </div>
   );
 }
+
+function GreatRevealEngine({ gameId, playerById }: { gameId: string; playerById: Record<string, any> }) {
+  const [banished, setBanished] = useState<any[]>([]);
+  const [roles, setRoles] = useState<Record<string, string>>({});
+  const [running, setRunning] = useState(false);
+
+  async function refresh() {
+    const order = await getBanishedOrder(gameId);
+    setBanished(order);
+    const revealedIds = order.filter((p: any) => p.banished_revealed).map((p: any) => p.id);
+    if (revealedIds.length > 0) {
+      const { data } = await supabase
+        .from("role_assignments")
+        .select("player_id, role, night")
+        .eq("game_id", gameId)
+        .in("player_id", revealedIds);
+      const map: Record<string, string> = {};
+      (data || []).forEach((r: any) => {
+        const p = order.find((x: any) => x.id === r.player_id);
+        if (p && r.night === p.banished_night) map[r.player_id] = r.role;
+      });
+      setRoles(map);
+    }
+  }
+
+  useEffect(() => {
+    refresh();
+    const ch = supabase.channel(`reveal-engine-${gameId}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "players" }, () => refresh())
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gameId]);
+
+  // Auto-sequence the reveal exactly once per shared screen load.
+  useEffect(() => {
+    if (running) return;
+    const pending = banished.filter((p) => !p.banished_revealed);
+    if (pending.length === 0) return;
+    setRunning(true);
+    (async () => {
+      for (const p of pending) {
+        await revealBanishedPlayer(gameId, p.id);
+        await new Promise((r) => setTimeout(r, 3500));
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [banished.length]);
+
+  if (banished.length === 0) {
+    return (
+      <PhaseShell title="THE GREAT REVEAL">
+        <div className="text-center font-serif italic text-muted-foreground">
+          No souls were banished. Open the final vote.
+        </div>
+      </PhaseShell>
+    );
+  }
+
+  return (
+    <PhaseShell title="⚜ THE GREAT REVEAL ⚜">
+      <div className="space-y-3">
+        {banished.map((p) => {
+          const revealed = p.banished_revealed;
+          const role = roles[p.id];
+          return (
+            <div
+              key={p.id}
+              className={`bg-card border rounded-sm p-5 text-center ${revealed ? "border-gold animate-reveal shadow-dramatic" : "border-[var(--gold)]/20 opacity-60"}`}
+            >
+              <div className="text-[10px] tracking-widest uppercase text-gold/70 mb-1">
+                Banished · Notte {p.banished_night}
+              </div>
+              <div className="font-display text-2xl text-shimmer">{p.name?.toUpperCase()}</div>
+              {revealed && role ? (
+                <div className={`mt-3 font-display text-xl tracking-[0.3em] uppercase ${role === "traitor" ? "text-[var(--blood)]" : role === "capo" ? "text-gold" : "text-muted-foreground"}`}>
+                  {role === "traitor" ? "🐍 Il Traditore" : role === "capo" ? "🔫 Il Capo" : "👤 Il Fideli"}
+                </div>
+              ) : (
+                <div className="mt-3 font-display text-sm tracking-widest uppercase text-muted-foreground">
+                  🔒 Sealed
+                </div>
+              )}
+              {revealed && role && (
+                <div className="mt-2 text-[10px] tracking-widest uppercase text-muted-foreground/80 italic">
+                  {role === "traitor" ? "Correct voters: +2 each" : "Voters lose −1 each"}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+      <div className="mt-5 text-center text-[10px] tracking-widest uppercase text-muted-foreground/70 italic">
+        Leaderboard updates live. Tap Ready when ready for the final vote.
+      </div>
+    </PhaseShell>
+  );
+}
