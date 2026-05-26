@@ -310,6 +310,9 @@ export type Database = {
       }
       players: {
         Row: {
+          banished: boolean
+          banished_night: number | null
+          banished_revealed: boolean
           created_at: string
           game_id: string
           giuro_used: boolean
@@ -319,6 +322,9 @@ export type Database = {
           total_points: number
         }
         Insert: {
+          banished?: boolean
+          banished_night?: number | null
+          banished_revealed?: boolean
           created_at?: string
           game_id: string
           giuro_used?: boolean
@@ -328,6 +334,9 @@ export type Database = {
           total_points?: number
         }
         Update: {
+          banished?: boolean
+          banished_night?: number | null
+          banished_revealed?: boolean
           created_at?: string
           game_id?: string
           giuro_used?: boolean
@@ -466,24 +475,30 @@ export type Database = {
           game_id: string
           id: string
           night: number
+          points_applied: boolean
           target_id: string
           voter_id: string
+          was_correct: boolean | null
         }
         Insert: {
           created_at?: string
           game_id: string
           id?: string
           night: number
+          points_applied?: boolean
           target_id: string
           voter_id: string
+          was_correct?: boolean | null
         }
         Update: {
           created_at?: string
           game_id?: string
           id?: string
           night?: number
+          points_applied?: boolean
           target_id?: string
           voter_id?: string
+          was_correct?: boolean | null
         }
         Relationships: [
           {
@@ -529,6 +544,7 @@ export type Database = {
         | "tribunale_leaderboard"
         | "tribunale_drinks"
         | "finished"
+        | "great_reveal"
       mission_state: "pending" | "completed" | "failed"
       player_role: "capo" | "traitor" | "civilian"
     }
@@ -670,6 +686,7 @@ export const Constants = {
         "tribunale_leaderboard",
         "tribunale_drinks",
         "finished",
+        "great_reveal",
       ],
       mission_state: ["pending", "completed", "failed"],
       player_role: ["capo", "traitor", "civilian"],

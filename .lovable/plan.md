@@ -1,111 +1,51 @@
 ## Goal
+Banishment becomes a true blind vote: roles stay hidden until a dramatic Night 3 "Great Reveal", and banished players are bound by **Il Silenzio**.
 
-Drop the dedicated "admin" role so every participant uses the same player UI, and bake murders into traitor missions as a high-value bonus that costs the victim a drink.
+## 1. Hide role on banishment
+- Remove the current "RoleReveal" / role animation that fires when a player is voted out at Il Tribunale.
+- After voting closes, voted-out players see a single full-screen card: **"Sei stato bandito"** ("You have been banished") — no role, no emoji hint, no team.
+- Persist a `banished` flag + `banished_night` on `players` so they're marked permanently.
+- On every screen (player view, lobby, leaderboard, tribunale), banished players render with a 🔒 marker and "Bandito" label — never their role.
+- Tribunale's per-night "Reveal" phase shows only *who* was banished, not their roles. Score tally still runs (points deferred — see §4).
 
-## 1. Setup — keep, but make it player-driven
+## 2. Il Silenzio rule
+- New rule card surfaced on the banished player's screen and in the rules section:
+  > **Il Silenzio** — A banished soul may lie, deflect, or stay silent, but must never confirm their true role. Breaking Il Silenzio breaks the family.
+- Mechanical enforcement where possible:
+  - **Giuro sulla Famiglia**: if a banished player tries to swear a Giuro *targeting themselves* (or asking a question of the form "are you a Traditore/Capo/Fideli" about themselves), block the action. Simpler enforceable rule: **banished players cannot initiate or be targeted by a Giuro that asks about their own role**. Cleanest implementation — disable the Giuro button entirely for banished players (both ask and answer), with tooltip "Il Silenzio — your voice is bound."
+- This is largely a social rule; the app enforces the Giuro lock and shows the rule prominently.
 
-- Keep `/admin` as a minimal lobby route, but rename and re-skin as `/setup`:
-  - First person to open the app lands on `/setup` if no game exists locally; enters the 18 names and creates the game.
-  - After creation, they're redirected to `/player/:id` like everyone else (pick their own name from the roster on first open).
-- Remove all admin-only controls (Begin Notte, Convene Il Tribunale, Reveal & Score, Advance) from this screen.
-- Drop the "Padrino's chamber" framing; this is just the lobby.
+## 3. The Great Reveal (Night 3, pre-final-vote)
+- New phase inserted before Night 3's final Round Table vote: `great_reveal`.
+- Triggered when a majority of players tap Ready on the new "Begin The Great Reveal" button (matches existing majority-vote pattern — no admin role).
+- Shared `/tribunale` screen plays a sequenced animation: for each banished player (in banishment order), reveal **Name → Role** with dramatic fade/scale animation, one at a time, ~3s each, with a "Next" majority-advance between each if desired (default: auto-sequence, single Ready to start).
+- Player phones mirror the reveal in sync via realtime.
 
-## 2. Phase advancement — majority vote on phones
+## 4. Delayed banishment points
+- Banishment votes from Nights 1 & 2 currently award points immediately. Change to **deferred**:
+  - Store each vote's correctness against the now-revealed role, but don't add to `total_points` until the Great Reveal.
+  - During the Great Reveal, after each role is shown, apply deltas live: **+2** per voter who voted to banish that player *if* they were a Traditore; **−1** per voter who voted to banish them *if* they were a Faithful (Il Fideli). Capo banishments: no delayed delta (or treat as Faithful — see open question).
+  - Leaderboard on `/tribunale` and player phones updates after each reveal step.
+- Existing immediate vote-scoring in `scoreNight` for nights 1–2 is removed for banishment votes; mission/arrest/alliance/murder scoring is unchanged.
 
-Add a "ready to advance" mechanic shared across all player phones.
-
-- New table `phase_ready` (game_id, player_id, phase, night). One row per player per phase.
-- On every player screen (`/player/:id` and `/tribunale`), show a single primary action at the bottom appropriate to the current phase, e.g.:
-  - `night_active` → "Ready for Il Tribunale"
-  - `tribunale_missions` → "Ready to vote"
-  - `tribunale_voting` → "I've voted"
-  - `tribunale_leaderboard` → "Ready for next night" (or "End trip" on night 3)
-- Tapping it inserts/deletes a `phase_ready` row for the current (game, player, phase, night). Button toggles between "Ready (N/M)" and "Cancel ready".
-- A lightweight client-side watcher (already using realtime) checks: when `phase_ready` count > 50% of living players for the current phase, the *first* client to detect it calls a small transition function that:
-  1. Re-checks majority server-side (in a `createServerFn`) to avoid races.
-  2. Calls the existing `beginNight` / `scoreNight` / phase update logic.
-  3. Clears `phase_ready` rows for that phase.
-- The new night `setup → night_active` transition runs `beginNight` automatically once majority is reached on the leaderboard screen.
-
-Tradeoff: the first-to-detect pattern means whichever phone wins the race triggers the transition; the server-side re-check + an `ON CONFLICT DO NOTHING` guard on a `phase_transitions` log table prevents double-execution.
-
-## 3. Murders — bonus mission for traitors
-
-- Add a third optional mission slot on traitor role assignments: `bonus_mission` (text) + `bonus_mission_state` (pending/completed/failed) + `bonus_target_id` (uuid, nullable).
-- During night assignment, every traitor also gets a generated bonus: "Murder {Player Name}" where the target is a random non-traitor still in the game.
-- On the traitor's player screen, the bonus appears in red below their two normal missions with two buttons:
-  - "Confirm kill" → marks `completed`, inserts a `murders` row (game_id, night, traitor_id, victim_id).
-  - "Abandon" → marks `failed`.
-- Scoring (`scoreNight`):
-  - Successful murder: +4 pts to the traitor (vs +2 for a normal mission completion), but only counted if the traitor isn't voted out.
-  - Failed/skipped murder: 0 pts, no penalty.
-- Victim consequence (drink penalty only): victim stays in the game, keeps voting and missions. At the tribunale reveal we add a "The Deceased" section listing each victim with their assigned drink (e.g. "{Victim} — 3 fingers, poured by the family"). No death state in the DB beyond the murders row.
-
-## 4. UI cleanup
-
-- `/admin` route file → renamed to `/setup`. Old admin link in `index.tsx` removed; replaced with "Open lobby" (only shown if no game exists locally) and "Open my player view".
-- `/tribunale` becomes a shared read-only view with the same "ready" button — no host-only buttons.
-- Add a small "Deceased tonight" panel at the top of the leaderboard phase pulling from `murders` for the current night.
-
-## Technical details
-
-### Schema changes (one migration)
-
-```sql
--- Bonus mission slot on role_assignments
-ALTER TABLE role_assignments
-  ADD COLUMN bonus_mission text,
-  ADD COLUMN bonus_mission_state mission_state DEFAULT 'pending',
-  ADD COLUMN bonus_target_id uuid;
-
--- Murders log
-CREATE TABLE murders (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  game_id uuid NOT NULL,
-  night int NOT NULL,
-  traitor_id uuid NOT NULL,
-  victim_id uuid NOT NULL,
-  fingers int NOT NULL DEFAULT 3,
-  created_at timestamptz NOT NULL DEFAULT now()
-);
-ALTER TABLE murders ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "public all murders" ON murders FOR ALL USING (true) WITH CHECK (true);
-ALTER PUBLICATION supabase_realtime ADD TABLE murders;
-
--- Ready-state per phase
-CREATE TABLE phase_ready (
-  game_id uuid NOT NULL,
-  player_id uuid NOT NULL,
-  night int NOT NULL,
-  phase game_phase NOT NULL,
-  created_at timestamptz NOT NULL DEFAULT now(),
-  PRIMARY KEY (game_id, player_id, night, phase)
-);
-ALTER TABLE phase_ready ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "public all phase_ready" ON phase_ready FOR ALL USING (true) WITH CHECK (true);
-ALTER PUBLICATION supabase_realtime ADD TABLE phase_ready;
-
--- Transition lock to prevent double-execution
-CREATE TABLE phase_transitions (
-  game_id uuid NOT NULL,
-  night int NOT NULL,
-  from_phase game_phase NOT NULL,
-  created_at timestamptz NOT NULL DEFAULT now(),
-  PRIMARY KEY (game_id, night, from_phase)
-);
-ALTER TABLE phase_transitions ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "public all phase_transitions" ON phase_transitions FOR ALL USING (true) WITH CHECK (true);
+## 5. Flow change
+```text
+Notte 3:
+  night_active → tribunale_missions → tribunale_arrests
+  → tribunale_discussion → tribunale_voting (1st round, optional — see Q)
+  → great_reveal  ← NEW
+  → final round table vote
+  → tribunale_reveal → leaderboard → drinks → finished
 ```
 
-### Files
+## Technical notes
+- **Schema migration**: add `players.banished bool`, `players.banished_night int`, `games.phase` enum value `great_reveal`, `votes.was_correct bool` (nullable, filled at Great Reveal), `votes.points_applied bool`.
+- **`src/lib/game.ts`**: drop banishment-vote points from `scoreNight`; add `runGreatReveal(gameId)` that walks banished players in order, updates `votes.was_correct`, increments `players.total_points` in steps with small delays for the live leaderboard effect.
+- **`src/routes/player.$playerId.tsx`**: replace `RoleReveal` for voted-out players with `BanishedCard`; hide role for any banished player everywhere; disable Giuro button for banished players; show Il Silenzio card.
+- **`src/routes/tribunale.tsx`**: add `GreatReveal` phase component with sequenced animation; update `RoleReveal` phase to skip banished players' roles outside the Great Reveal; new ready label "Begin The Great Reveal".
+- **`src/components/ReadyButton.tsx`** + `NEXT_PHASE` map: insert `great_reveal` between voting and final reveal on Night 3 only.
 
-- `supabase/migrations/<new>.sql` — schema above.
-- `src/lib/game.ts` — extend `beginNight` to write bonus mission for traitors; extend `scoreNight` for bonus kill points + drink fingers; add `tryAdvancePhase(gameId, fromPhase)` helper that does the majority-check + transition lock + appropriate next action.
-- `src/lib/missions.ts` — small helper `formatMurderMission(name)`.
-- `src/routes/setup.tsx` (renamed from `admin.tsx`) — lobby only; no phase controls.
-- Delete `src/routes/admin.tsx` (replaced).
-- `src/routes/player.$playerId.tsx` — add bonus mission card for traitors, add bottom "Ready" button calling `tryAdvancePhase`, show ready count.
-- `src/routes/tribunale.tsx` — strip host controls, add the same "Ready" pattern, add "Deceased tonight" panel sourced from `murders`.
-- `src/routes/index.tsx` — update entry links: "Open lobby" / "Join as player".
-
-No auth changes. All tables stay open-policy (matches existing pattern). No edge functions.
+## Open questions
+1. **Capo banishments** — currently Capo is on the Faithful side; should banishing a Capo cost the voter −1 (treat as Faithful), or 0 (neutral)?
+2. **Night 3 has two votes?** Plan above assumes Night 3 keeps its normal accusation/vote *and* a final round-table vote after the Great Reveal. Or should Night 3 skip the first vote and go straight discussion → Great Reveal → final vote?
+3. **Great Reveal pacing** — single Ready to play the whole sequence, or one Ready between each banished player?
