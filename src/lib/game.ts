@@ -346,6 +346,7 @@ const NEXT_PHASE: Record<string, string> = {
   tribunale_arrests: "tribunale_discussion",
   tribunale_discussion: "tribunale_voting",
   tribunale_voting: "tribunale_reveal",
+  great_reveal: "tribunale_voting",
   tribunale_reveal: "tribunale_leaderboard",
   tribunale_leaderboard: "tribunale_drinks",
   tribunale_drinks: "setup", // means: advance night (or finish)
@@ -389,6 +390,11 @@ export async function tryAdvancePhase(gameId: string) {
   if (phase === "setup") {
     // Start the current night
     await beginNight(gameId, night);
+    return;
+  }
+  // On Night 3 only, after discussion goes to The Great Reveal before voting
+  if (phase === "tribunale_discussion" && night === 3) {
+    await supabase.from("games").update({ phase: "great_reveal" as any }).eq("id", gameId);
     return;
   }
   if (phase === "tribunale_voting") {
