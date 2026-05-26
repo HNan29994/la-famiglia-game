@@ -6,6 +6,7 @@ import { Ornament } from "@/components/Ornament";
 import { RoleBadge, roleMeta } from "@/components/RoleBadge";
 import type { Role } from "@/lib/game";
 import { recordMurder, abandonMurder } from "@/lib/game";
+import { revealBanishedPlayer, getBanishedOrder } from "@/lib/game";
 import { ReadyButton } from "@/components/ReadyButton";
 import { SPECIAL_EVENTS } from "@/lib/missions";
 import { toast } from "sonner";
