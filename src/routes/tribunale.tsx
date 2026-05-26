@@ -253,10 +253,16 @@ function RoleReveal({ assignments, playerById, night, onNext }: any) {
       <div className="space-y-2">
         {assignments.map((a: any, i: number) => {
           const meta = roleMeta(a.role as Role);
+          const player = playerById[a.player_id];
+          const banishedHere = player?.banished && !player?.banished_revealed;
           return (
             <div key={a.id} className="flex justify-between items-center bg-card border border-[var(--gold)]/30 rounded-sm p-3 animate-fade-up" style={{ animationDelay: `${i * 60}ms` }}>
-              <span className="font-serif">{playerById[a.player_id]?.name}</span>
-              <span className={`font-display text-sm tracking-widest uppercase ${meta.color}`}>{meta.emoji} {meta.italian}</span>
+              <span className="font-serif">{player?.name}</span>
+              {banishedHere ? (
+                <span className="font-display text-sm tracking-widest uppercase text-[var(--blood)]">🔒 Bandito</span>
+              ) : (
+                <span className={`font-display text-sm tracking-widest uppercase ${meta.color}`}>{meta.emoji} {meta.italian}</span>
+              )}
             </div>
           );
         })}
