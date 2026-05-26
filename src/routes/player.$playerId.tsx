@@ -691,6 +691,8 @@ function GiuroCard({
 
   const myGiuros = giuros.filter((g) => g.asker_id === me.id);
   const used = me.giuro_used || myGiuros.length > 0;
+  // Banished players are bound by Il Silenzio — can neither swear nor be targeted.
+  const targetable = allPlayers.filter((p) => p.id !== me.id && !p.banished);
 
   async function submit() {
     const q = question.trim();
