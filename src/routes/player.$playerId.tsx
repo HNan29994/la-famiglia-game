@@ -745,7 +745,7 @@ function GiuroCard({
             className="w-full bg-input border border-[var(--gold)]/30 rounded-sm py-2 px-3 font-serif text-sm"
           >
             <option value="">Choose your target…</option>
-            {allPlayers.filter((p) => p.id !== me.id).map((p) => (
+            {targetable.map((p) => (
               <option key={p.id} value={p.id}>{p.name}</option>
             ))}
           </select>
