@@ -155,8 +155,8 @@ function TribunalePage() {
 function PhaseShell({ title, children, onNext, nextLabel = "Continue →" }: any) {
   return (
     <div className="mt-6">
-      <Ornament>{title}</Ornament>
-      <div className="mt-4">{children}</div>
+      {title ? <Ornament>{title}</Ornament> : null}
+      <div className={title ? "mt-4" : ""}>{children}</div>
       {onNext && (
         <button onClick={onNext} className="mt-6 w-full font-display tracking-widest text-sm uppercase bg-gradient-gold text-primary-foreground py-4 rounded-sm shadow-gold">
           {nextLabel}
@@ -225,7 +225,7 @@ function DiscussionPhase({ timer, onNext }: any) {
 function VotingPhase({ players, votes, onClose }: any) {
   const voters = new Set(votes.map((v: any) => v.voter_id));
   return (
-    <PhaseShell title={`IL VOTO · ${voters.size}/${players.length}`} onNext={onClose} nextLabel="Reveal All Roles →">
+    <PhaseShell title="" onNext={onClose} nextLabel="Reveal All Roles →">
       <div className="bg-card border border-gold rounded-sm p-6 text-center">
         <div className="font-display text-5xl text-shimmer">{voters.size}/{players.length}</div>
         <div className="text-sm font-serif italic text-muted-foreground mt-3">Players are voting on their own phones…</div>

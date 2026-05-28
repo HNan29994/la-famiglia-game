@@ -109,8 +109,12 @@ function LobbyView({ gameId, onReset }: { gameId: string; onReset: () => void })
   useEffect(() => {
     let mounted = true;
     async function refresh() {
-      const { data: p } = await supabase.from("players").select("*").eq("game_id", gameId).order("name");
-      if (mounted) setPlayers(p || []);
+      const { data: p } = await supabase.from("players").select("*").eq("game_id", gameId);
+      if (mounted) setPlayers((p || []).slice().sort((a: any, b: any) => {
+        const na = Number(a.name), nb = Number(b.name);
+        if (!Number.isNaN(na) && !Number.isNaN(nb)) return na - nb;
+        return String(a.name).localeCompare(String(b.name));
+      }));
       const { data: g } = await supabase.from("games").select("*").eq("id", gameId).maybeSingle();
       if (mounted && g) {
         setGame(g);
@@ -179,7 +183,7 @@ function LobbyView({ gameId, onReset }: { gameId: string; onReset: () => void })
           {savingN3 ? "Saving…" : n3Locked ? "Locked · Night 3 in progress" : "Save Night 3 Game"}
         </button>
         <div className="mt-2 text-[10px] tracking-widest uppercase text-muted-foreground/70 text-center">
-          Displayed on every player's screen during Notte 3.
+          Displayed on every player's screen during Night 3.
         </div>
       </div>
 
