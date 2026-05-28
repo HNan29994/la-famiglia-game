@@ -187,9 +187,6 @@ function PlayerView() {
         <GreatRevealMirror gameId={game.id} allPlayers={allPlayers} />
       )}
 
-      {game.phase === "setup" && (
-        <EmptyState text={`Notte ${game.current_night} has not yet begun. Tap ready when the family is ready to start.`} />
-      )}
 
       {assignment && (game.phase === "night_active" || game.phase.startsWith("tribunale_")) && (
         <>
