@@ -271,7 +271,7 @@ function PlayerView() {
         </div>
       )}
 
-      <Leaderboard players={allPlayers} meId={playerId} />
+      {game.phase !== "setup" && <Leaderboard players={allPlayers} meId={playerId} />}
 
       {game.phase !== "finished" && readyLabel[game.phase] && (
         <ReadyButton
