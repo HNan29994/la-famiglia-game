@@ -225,7 +225,7 @@ function DiscussionPhase({ timer, onNext }: any) {
 function VotingPhase({ players, votes, onClose }: any) {
   const voters = new Set(votes.map((v: any) => v.voter_id));
   return (
-    <PhaseShell title={`IL VOTO · ${voters.size}/${players.length}`} onNext={onClose} nextLabel="Reveal All Roles →">
+    <PhaseShell title="" onNext={onClose} nextLabel="Reveal All Roles →">
       <div className="bg-card border border-gold rounded-sm p-6 text-center">
         <div className="font-display text-5xl text-shimmer">{voters.size}/{players.length}</div>
         <div className="text-sm font-serif italic text-muted-foreground mt-3">Players are voting on their own phones…</div>
