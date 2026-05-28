@@ -102,7 +102,7 @@ function PlayerView() {
         {game.phase === "great_reveal" && (
           <GreatRevealMirror gameId={game.id} allPlayers={allPlayers} />
         )}
-        <Leaderboard players={allPlayers} meId={playerId} />
+        {game.phase !== "setup" && <Leaderboard players={allPlayers} meId={playerId} />}
         {game.phase !== "finished" && readyLabel[game.phase] && (
           <ReadyButton
             gameId={game.id}
@@ -113,6 +113,57 @@ function PlayerView() {
             playerCount={allPlayers.length}
           />
         )}
+      </div>
+    );
+  }
+
+  // Setup phase — dedicated pre-game screen
+  if (game.phase === "setup") {
+    return (
+      <div className="min-h-screen px-5 max-w-md mx-auto pb-20">
+        <AppHeader subtitle={`Welcome, ${player.name}`} />
+        <div className="mt-8 text-center">
+          <div className="font-display text-4xl tracking-[0.3em] uppercase text-gold text-shadow-gold">
+            {player.name}
+          </div>
+          <div className="mt-4 font-serif italic text-muted-foreground text-base">
+            La Famiglia è qui — attendere l'inizio
+          </div>
+          <div className="mt-1 text-xs tracking-widest uppercase text-muted-foreground/60">
+            The family is here — waiting to begin
+          </div>
+        </div>
+        <div className="mt-10">
+          <Ornament>LA FAMIGLIA · {allPlayers.length} SOULS</Ornament>
+          <div className="mt-4 grid grid-cols-2 gap-2">
+            {allPlayers
+              .slice()
+              .sort((a: any, b: any) => {
+                const na = Number(a.name), nb = Number(b.name);
+                if (!Number.isNaN(na) && !Number.isNaN(nb)) return na - nb;
+                return String(a.name).localeCompare(String(b.name));
+              })
+              .map((p: any) => (
+                <div
+                  key={p.id}
+                  className={`border border-[var(--gold)]/20 rounded-sm py-3 px-2 text-center ${p.id === playerId ? "bg-[var(--gold)]/10 border-gold" : "bg-card"}`}
+                >
+                  <div className="font-serif text-sm text-foreground">{p.name}</div>
+                  {p.id === playerId && (
+                    <div className="text-[9px] tracking-widest uppercase text-gold mt-1">You</div>
+                  )}
+                </div>
+              ))}
+          </div>
+        </div>
+        <ReadyButton
+          gameId={game.id}
+          playerId={playerId}
+          night={game.current_night}
+          phase={game.phase}
+          label={readyLabel[game.phase]}
+          playerCount={allPlayers.length}
+        />
       </div>
     );
   }
@@ -136,9 +187,6 @@ function PlayerView() {
         <GreatRevealMirror gameId={game.id} allPlayers={allPlayers} />
       )}
 
-      {game.phase === "setup" && (
-        <EmptyState text={`Notte ${game.current_night} has not yet begun. Tap ready when the family is ready to start.`} />
-      )}
 
       {assignment && (game.phase === "night_active" || game.phase.startsWith("tribunale_")) && (
         <>
@@ -223,7 +271,7 @@ function PlayerView() {
         </div>
       )}
 
-      <Leaderboard players={allPlayers} meId={playerId} />
+      {game.phase !== "setup" && <Leaderboard players={allPlayers} meId={playerId} />}
 
       {game.phase !== "finished" && readyLabel[game.phase] && (
         <ReadyButton
