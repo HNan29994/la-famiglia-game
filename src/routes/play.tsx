@@ -13,6 +13,7 @@ export const Route = createFileRoute("/play")({
 function PlayPicker() {
   const [players, setPlayers] = useState<any[]>([]);
   const [gameId, setGameId] = useState<string | null>(null);
+  const [phase, setPhase] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
@@ -32,17 +33,24 @@ function PlayPicker() {
       }
       if (!g) { setLoading(false); return; }
       setGameId(g.id);
-      const { data: ps } = await supabase.from("players").select("*").eq("game_id", g.id).order("name");
-      setPlayers(ps || []);
+      setPhase(g.phase ?? null);
+      const { data: ps } = await supabase.from("players").select("*").eq("game_id", g.id);
+      setPlayers((ps || []).slice().sort((a: any, b: any) => {
+        const na = Number(a.name), nb = Number(b.name);
+        if (!Number.isNaN(na) && !Number.isNaN(nb)) return na - nb;
+        return String(a.name).localeCompare(String(b.name));
+      }));
       setLoading(false);
     })();
   }, []);
 
   function chooseName(playerId: string) {
-    if (!gameId) return;
+    if (!gameId || !selectable) return;
     setStoredPlayerId(gameId, playerId);
     navigate({ to: "/player/$playerId", params: { playerId } });
   }
+
+  const selectable = !phase || phase === "setup";
 
   if (loading) return <div className="p-8 text-center text-muted-foreground">…</div>;
   if (!gameId || players.length === 0) {
@@ -61,14 +69,16 @@ function PlayPicker() {
       <AppHeader subtitle="Identify yourself" />
       <Ornament>SELECT YOUR NAME</Ornament>
       <p className="text-center text-xs text-muted-foreground mt-4 mb-6 font-serif italic">
-        This phone will remember you. Choose carefully.
+        {selectable ? "This phone will remember you. Choose carefully." : "Waiting for the family to settle — selection is locked while the game is in progress."}
       </p>
       <div className="grid grid-cols-2 gap-3">
         {players.map((p) => (
           <button
             key={p.id}
             onClick={() => chooseName(p.id)}
-            className="border border-[var(--gold)]/30 rounded-sm py-4 px-3 bg-card hover:bg-[var(--gold)]/10 transition text-center"
+            disabled={!selectable}
+            title={selectable ? undefined : "Waiting for game to begin"}
+            className={`border border-[var(--gold)]/30 rounded-sm py-4 px-3 bg-card transition text-center ${selectable ? "hover:bg-[var(--gold)]/10" : "opacity-50 cursor-not-allowed"}`}
           >
             <div className="font-serif text-base text-foreground">{p.name}</div>
             <div className="text-[10px] tracking-widest uppercase text-muted-foreground mt-1">
