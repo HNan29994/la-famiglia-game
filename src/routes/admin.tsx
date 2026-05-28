@@ -202,7 +202,25 @@ function LobbyView({ gameId, onReset }: { gameId: string; onReset: () => void })
         ))}
       </div>
 
-      <button onClick={() => { if (confirm("End the current game for everyone on this device?")) onReset(); }} className="mt-10 w-full text-[10px] tracking-widest uppercase text-muted-foreground/60 py-2">
+      <button
+        onClick={async () => {
+          if (!confirm("Permanently delete this game and all its data? This cannot be undone.")) return;
+          const tables = [
+            "alliances", "arrests", "drink_assignments", "giuros",
+            "murders", "phase_ready", "phase_transitions", "role_assignments",
+            "suspect_tips", "votes", "players",
+          ];
+          await Promise.all(tables.map((t) => supabase.from(t).delete().eq("game_id", gameId)));
+          await supabase.from("games").delete().eq("id", gameId);
+          localStorage.removeItem("famiglia_game_id");
+          window.location.href = "/admin";
+        }}
+        className="mt-6 w-full font-display tracking-widest text-xs uppercase bg-[var(--blood)] text-white py-3 rounded-sm"
+      >
+        New Game
+      </button>
+
+      <button onClick={() => { if (confirm("End the current game for everyone on this device?")) onReset(); }} className="mt-4 w-full text-[10px] tracking-widest uppercase text-muted-foreground/60 py-2">
         Forget Game on This Device
       </button>
     </div>
