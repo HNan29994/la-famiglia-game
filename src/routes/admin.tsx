@@ -210,7 +210,7 @@ function LobbyView({ gameId, onReset }: { gameId: string; onReset: () => void })
             "murders", "phase_ready", "phase_transitions", "role_assignments",
             "suspect_tips", "votes", "players",
           ];
-          await Promise.all(tables.map((t) => supabase.from(t).delete().eq("game_id", gameId)));
+          await Promise.all(tables.map((t) => (supabase as any).from(t).delete().eq("game_id", gameId)));
           await supabase.from("games").delete().eq("id", gameId);
           localStorage.removeItem("famiglia_game_id");
           window.location.href = "/admin";
