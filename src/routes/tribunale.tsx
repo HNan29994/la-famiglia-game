@@ -155,8 +155,8 @@ function TribunalePage() {
 function PhaseShell({ title, children, onNext, nextLabel = "Continue →" }: any) {
   return (
     <div className="mt-6">
-      <Ornament>{title}</Ornament>
-      <div className="mt-4">{children}</div>
+      {title ? <Ornament>{title}</Ornament> : null}
+      <div className={title ? "mt-4" : ""}>{children}</div>
       {onNext && (
         <button onClick={onNext} className="mt-6 w-full font-display tracking-widest text-sm uppercase bg-gradient-gold text-primary-foreground py-4 rounded-sm shadow-gold">
           {nextLabel}
