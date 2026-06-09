@@ -20,7 +20,6 @@ function TribunalePage() {
   const [game, setGame] = useState<any>(null);
   const [players, setPlayers] = useState<any[]>([]);
   const [assignments, setAssignments] = useState<any[]>([]);
-  const [arrests, setArrests] = useState<any[]>([]);
   const [votes, setVotes] = useState<any[]>([]);
   const [timer, setTimer] = useState(180);
   const [murders, setMurders] = useState<any[]>([]);
@@ -40,8 +39,6 @@ function TribunalePage() {
     if (g) {
       const { data: a } = await supabase.from("role_assignments").select("*").eq("game_id", id).eq("night", g.current_night);
       setAssignments(a || []);
-      const { data: ar } = await supabase.from("arrests").select("*").eq("game_id", id).eq("night", g.current_night);
-      setArrests(ar || []);
       const { data: v } = await supabase.from("votes").select("*").eq("game_id", id).eq("night", g.current_night);
       setVotes(v || []);
       const { data: m } = await supabase.from("murders").select("*").eq("game_id", id).eq("night", g.current_night);
@@ -121,9 +118,6 @@ function TribunalePage() {
       {game.phase === "tribunale_missions" && (
         <MissionReport assignments={assignments} playerById={playerById} />
       )}
-      {game.phase === "tribunale_arrests" && (
-        <ArrestsReveal arrests={arrests} playerById={playerById} />
-      )}
       {game.phase === "tribunale_discussion" && (
         <>
           <DiscussionPhase timer={timer} />
@@ -173,7 +167,7 @@ function MissionReport({ assignments, playerById, onNext }: any) {
     return bc - ac;
   });
   return (
-    <PhaseShell title="MISSION REPORT" onNext={onNext} nextLabel="Reveal Arrests →">
+    <PhaseShell title="MISSION REPORT" onNext={onNext} nextLabel="Open Discussion →">
       <div className="space-y-2">
         {sorted.map((a: any) => {
           const completed = [a.mission_1_state, a.mission_2_state].filter((s) => s === "completed").length;
@@ -184,24 +178,6 @@ function MissionReport({ assignments, playerById, onNext }: any) {
             </div>
           );
         })}
-      </div>
-    </PhaseShell>
-  );
-}
-
-function ArrestsReveal({ arrests, playerById, onNext }: any) {
-  return (
-    <PhaseShell title="THE CAPI ACT" onNext={onNext} nextLabel="Open Discussion →">
-      {arrests.length === 0 && <div className="text-center font-serif italic text-muted-foreground">No arrests this night.</div>}
-      <div className="space-y-3">
-        {arrests.map((ar: any) => (
-          <div key={ar.id} className="bg-card border border-gold rounded-sm p-4 text-center animate-fade-up">
-            <div className="text-[10px] tracking-widest uppercase text-gold">Il Capo</div>
-            <div className="font-display text-lg text-foreground">{playerById[ar.capo_id]?.name}</div>
-            <div className="my-2 text-gold">↓ ARRESTS ↓</div>
-            <div className="font-display text-xl text-shimmer">{playerById[ar.target_id]?.name?.toUpperCase()}</div>
-          </div>
-        ))}
       </div>
     </PhaseShell>
   );
