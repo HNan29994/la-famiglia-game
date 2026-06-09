@@ -518,8 +518,8 @@ function GreatRevealEngine({ gameId, playerById }: { gameId: string; playerById:
               </div>
               <div className="font-display text-2xl text-shimmer">{p.name?.toUpperCase()}</div>
               {revealed && role ? (
-                <div className={`mt-3 font-display text-xl tracking-[0.3em] uppercase ${role === "traitor" ? "text-[var(--blood)]" : role === "capo" ? "text-gold" : "text-muted-foreground"}`}>
-                  {role === "traitor" ? "🐍 Il Traditore" : role === "capo" ? "🔫 Il Capo" : "👤 Il Fideli"}
+                <div className={`mt-3 font-display text-xl tracking-[0.3em] uppercase ${role === "traitor" ? "text-[var(--blood)]" : "text-muted-foreground"}`}>
+                  {role === "traitor" ? "🐍 Il Traditore" : "👤 Il Fideli"}
                 </div>
               ) : (
                 <div className="mt-3 font-display text-sm tracking-widest uppercase text-muted-foreground">
