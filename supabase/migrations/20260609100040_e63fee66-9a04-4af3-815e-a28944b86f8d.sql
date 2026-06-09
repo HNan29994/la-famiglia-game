@@ -1,0 +1,1 @@
+ALTER TYPE public.player_role RENAME VALUE 'civilian' TO 'faithful';

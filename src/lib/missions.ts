@@ -1,4 +1,4 @@
-export const CIVILIAN_MISSIONS = [
+export const FAITHFUL_MISSIONS = [
   "Get someone to pour you a drink without directly asking",
   "Get 3 people to follow you to the pool within 15 minutes",
   "Take a photo with someone without them knowing it's for a mission",
@@ -7,28 +7,23 @@ export const CIVILIAN_MISSIONS = [
   "Get someone to swap seats with you at dinner",
   "Convince someone to give you a compliment in Italian",
   "Get a high-five from at least 4 different people in 10 minutes",
+  "Order a round of espressos for 3 people after dinner",
+  "Get someone to jump into the pool fully clothed",
+  "Convince two people to swap drinks at the bar",
+  "Toast 'Salute!' with 5 different people in one sitting",
+  "Get the table to sing along to one Italian song at dinner",
+  "Lead a poolside cannonball contest with at least 3 jumpers",
 ];
 
 export const TRAITOR_MISSIONS = [
   "Get one of Il Fideli to do a dare without them realising it's a mission",
-  "Convince someone to switch their alliance partner",
   "Say 'la famiglia' out loud in a group of 5+ without anyone calling it out",
-  "Get a Capo to suspect the wrong person (verbally)",
   "Shake hands formally with every other traitor without anyone noticing",
   "Get someone to agree to vote for a specific person tonight",
   "Plant a wine glass at someone else's seat without being noticed",
   "Whisper a fake secret to two different Il Fideli",
-];
-
-export const CAPO_MISSIONS = [
-  "Catch a player mid-mission (tap them and call 'fermati!')",
-  "Get a traitor to admit their role while they're holding a drink",
-  "Correctly guess all 4 traitors before Il Tribunale",
-  "Form an alliance with a traitor without knowing they're a traitor",
-  "Confirm your suspect tip by gathering evidence from 2 other players",
-  "Warn one of Il Fideli that they're being targeted, correctly",
-  "Interrogate 3 different players using only one question each",
-  "Get a confession by offering immunity (you can't actually grant it)",
+  "Convince a Fideli to accuse another innocent player publicly",
+  "Get a Fideli to buy you a drink while you steer the conversation away from the game",
 ];
 
 export const SPECIAL_EVENTS: Record<number, { emoji: string; name: string; description: string }> = {
@@ -37,13 +32,12 @@ export const SPECIAL_EVENTS: Record<number, { emoji: string; name: string; descr
   3: { emoji: "🔥", name: "La Resa dei Conti", description: "Points doubled tonight. If not all 4 traitors are voted out, Il Fideli lose drink distribution rights." },
 };
 
-export function missionsForRole(role: "capo" | "traitor" | "civilian"): string[] {
-  if (role === "capo") return CAPO_MISSIONS;
+export function missionsForRole(role: "traitor" | "faithful"): string[] {
   if (role === "traitor") return TRAITOR_MISSIONS;
-  return CIVILIAN_MISSIONS;
+  return FAITHFUL_MISSIONS;
 }
 
-export function pickTwoMissions(role: "capo" | "traitor" | "civilian"): [string, string] {
+export function pickTwoMissions(role: "traitor" | "faithful"): [string, string] {
   const pool = [...missionsForRole(role)];
   const i = Math.floor(Math.random() * pool.length);
   const m1 = pool.splice(i, 1)[0];

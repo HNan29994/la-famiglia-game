@@ -1,23 +1,19 @@
 import { supabase } from "@/integrations/supabase/client";
 import { pickTwoMissions } from "./missions";
 
-export type Role = "capo" | "traitor" | "civilian";
+export type Role = "traitor" | "faithful";
 
 export const MURDER_FINGERS = 3;
 
 /** Scale role counts to the actual player count. */
 export function roleCountsFor(n: number): Record<Role, number> {
-  let capo = 2;
   let traitor = 4;
-  if (n < 6) { capo = 1; traitor = 1; }
-  else if (n < 9) { capo = 1; traitor = 2; }
-  else if (n < 12) { capo = 1; traitor = 3; }
-  else if (n < 15) { capo = 2; traitor = 3; }
-  // 15+ keeps 2/4
-  capo = Math.min(capo, n);
-  traitor = Math.min(traitor, Math.max(0, n - capo));
-  const civilian = Math.max(0, n - capo - traitor);
-  return { capo, traitor, civilian };
+  if (n < 6) traitor = 1;
+  else if (n < 9) traitor = 2;
+  else if (n < 14) traitor = 3;
+  traitor = Math.min(traitor, Math.max(0, n - 1));
+  const faithful = Math.max(0, n - traitor);
+  return { traitor, faithful };
 }
 
 function shuffle<T>(arr: T[]): T[] {
@@ -30,36 +26,15 @@ function shuffle<T>(arr: T[]): T[] {
 }
 
 /**
- * Assign roles for `night` such that no player has the same role as last night.
- * Uses a constraint-satisfaction approach with retries.
+ * Assign roles randomly. Roles are fixed for the whole trip (assigned once on
+ * Night 1) so no "no-repeat" constraint is needed.
  */
-export function assignRoles(
-  playerIds: string[],
-  lastRoles: Record<string, Role | undefined>,
-): Record<string, Role> {
+export function assignRoles(playerIds: string[]): Record<string, Role> {
   const counts = roleCountsFor(playerIds.length);
   const roleSlots: Role[] = [
-    ...Array(counts.capo).fill("capo"),
     ...Array(counts.traitor).fill("traitor"),
-    ...Array(counts.civilian).fill("civilian"),
+    ...Array(counts.faithful).fill("faithful"),
   ];
-
-  for (let attempt = 0; attempt < 200; attempt++) {
-    const shuffled = shuffle(roleSlots);
-    const assignment: Record<string, Role> = {};
-    let ok = true;
-    for (let i = 0; i < playerIds.length; i++) {
-      const pid = playerIds[i];
-      const role = shuffled[i];
-      if (lastRoles[pid] && lastRoles[pid] === role) {
-        ok = false;
-        break;
-      }
-      assignment[pid] = role;
-    }
-    if (ok) return assignment;
-  }
-  // Fallback: ignore constraint
   const shuffled = shuffle(roleSlots);
   const assignment: Record<string, Role> = {};
   playerIds.forEach((pid, i) => (assignment[pid] = shuffled[i]));
@@ -75,34 +50,36 @@ export async function beginNight(gameId: string, night: number) {
   if (pErr) throw pErr;
   if (!players || players.length === 0) throw new Error("No players in game");
 
-  // Fetch last night's role assignments
-  const lastRoles: Record<string, Role> = {};
-  if (night > 1) {
+  const activePlayers = (players as any[]).filter((p) => !p.banished);
+  const ids = activePlayers.map((p) => p.id);
+  if (ids.length === 0) throw new Error("All players are banished");
+
+  // Roles are assigned ONCE on Night 1 and reused for Nights 2/3.
+  let roleByPlayer: Record<string, Role> = {};
+  if (night === 1) {
+    roleByPlayer = assignRoles(ids);
+  } else {
     const { data: prev } = await supabase
       .from("role_assignments")
       .select("player_id, role")
       .eq("game_id", gameId)
-      .eq("night", night - 1);
-    prev?.forEach((r: any) => (lastRoles[r.player_id] = r.role));
+      .eq("night", 1);
+    (prev || []).forEach((r: any) => (roleByPlayer[r.player_id] = r.role as Role));
+    // Safety: any player missing from night 1 (shouldn't happen) gets a fresh assignment.
+    const missing = ids.filter((id) => !roleByPlayer[id]);
+    if (missing.length > 0) Object.assign(roleByPlayer, assignRoles(missing));
   }
-
-  const activePlayers = (players as any[]).filter((p) => !p.banished);
-  const ids = activePlayers.map((p) => p.id);
-  if (ids.length === 0) throw new Error("All players are banished");
-  const assignment = assignRoles(ids, lastRoles);
 
   // Delete any existing assignments for this night (in case of re-roll)
   await supabase.from("role_assignments").delete().eq("game_id", gameId).eq("night", night);
-  await supabase.from("suspect_tips").delete().eq("game_id", gameId).eq("night", night);
 
-  // Insert role assignments with missions
-  const traitorIds = ids.filter((id) => assignment[id] === "traitor");
-  const nonTraitorIds = ids.filter((id) => assignment[id] !== "traitor");
+  const traitorIds = ids.filter((id) => roleByPlayer[id] === "traitor");
+  const nonTraitorIds = ids.filter((id) => roleByPlayer[id] !== "traitor");
   const playerNames: Record<string, string> = {};
   activePlayers.forEach((p: any) => (playerNames[p.id] = p.name));
 
   const rows = ids.map((pid) => {
-    const role = assignment[pid];
+    const role = roleByPlayer[pid];
     const [m1, m2] = pickTwoMissions(role);
     let bonus_mission: string | null = null;
     let bonus_target_id: string | null = null;
@@ -126,25 +103,6 @@ export async function beginNight(gameId: string, night: number) {
   const { error: insErr } = await supabase.from("role_assignments").insert(rows);
   if (insErr) throw insErr;
 
-  // Create suspect tips for each Capo
-  const capoIds = ids.filter((id) => assignment[id] === "capo");
-  const civilianIds = ids.filter((id) => assignment[id] === "civilian");
-
-  const tipRows = capoIds.map((capoId) => {
-    const realTraitor = traitorIds[Math.floor(Math.random() * traitorIds.length)];
-    const decoys = shuffle(civilianIds).slice(0, 2);
-    return {
-      game_id: gameId,
-      capo_id: capoId,
-      night,
-      suspect_ids: shuffle([realTraitor, ...decoys]),
-    };
-  });
-  if (tipRows.length > 0 && traitorIds.length > 0) {
-    const { error: tErr } = await supabase.from("suspect_tips").insert(tipRows);
-    if (tErr) throw tErr;
-  }
-
   // Update game state
   await supabase
     .from("games")
@@ -166,24 +124,11 @@ export async function scoreNight(gameId: string, night: number) {
     .eq("night", night);
   if (!assignments) return;
 
-  const { data: arrests } = await supabase
-    .from("arrests")
-    .select("*")
-    .eq("game_id", gameId)
-    .eq("night", night);
-
   const { data: votes } = await supabase
     .from("votes")
     .select("*")
     .eq("game_id", gameId)
     .eq("night", night);
-
-  const { data: alliances } = await supabase
-    .from("alliances")
-    .select("*")
-    .eq("game_id", gameId)
-    .eq("night", night)
-    .eq("status", "accepted");
 
   const roleByPlayer: Record<string, Role> = {};
   assignments.forEach((a: any) => (roleByPlayer[a.player_id] = a.role));
@@ -195,12 +140,6 @@ export async function scoreNight(gameId: string, night: number) {
   });
   const sortedTargets = Object.entries(voteCount).sort((a, b) => b[1] - a[1]);
   const votedOut = new Set(sortedTargets.slice(0, 4).map(([id]) => id));
-
-  // Determine winning team for night: civilians/capos win if majority of traitors voted out, else traitors win
-  const traitorIds = Object.entries(roleByPlayer).filter(([, r]) => r === "traitor").map(([id]) => id);
-  const traitorsCaught = traitorIds.filter((id) => votedOut.has(id)).length;
-  const civiliansWin = traitorsCaught >= Math.ceil(traitorIds.length / 2);
-  const winningTeam: Role[] = civiliansWin ? ["capo", "civilian"] : ["traitor"];
 
   // Per-player points
   const pointsByPlayer: Record<string, number> = {};
@@ -224,24 +163,6 @@ export async function scoreNight(gameId: string, night: number) {
       pts += 4;
     }
     pointsByPlayer[a.player_id] = pts;
-  }
-
-  // Arrest points and mark correctness
-  for (const arr of arrests || []) {
-    const targetRole = roleByPlayer[arr.target_id];
-    const correct = targetRole === "traitor";
-    pointsByPlayer[arr.capo_id] = (pointsByPlayer[arr.capo_id] || 0) + (correct ? 3 : -2);
-    await supabase.from("arrests").update({ was_correct: correct }).eq("id", arr.id);
-  }
-
-  // Alliance bonus
-  for (const al of alliances || []) {
-    const r1 = roleByPlayer[al.requester_id];
-    const r2 = roleByPlayer[al.partner_id];
-    if (r1 && r2 && winningTeam.includes(r1) && winningTeam.includes(r2)) {
-      pointsByPlayer[al.requester_id] = (pointsByPlayer[al.requester_id] || 0) + 1;
-      pointsByPlayer[al.partner_id] = (pointsByPlayer[al.partner_id] || 0) + 1;
-    }
   }
 
   // Top mission scorer bonus
@@ -342,8 +263,7 @@ export async function toggleReady(
 const NEXT_PHASE: Record<string, string> = {
   setup: "night_active",
   night_active: "tribunale_missions",
-  tribunale_missions: "tribunale_arrests",
-  tribunale_arrests: "tribunale_discussion",
+  tribunale_missions: "tribunale_discussion",
   tribunale_discussion: "tribunale_voting",
   tribunale_voting: "tribunale_reveal",
   great_reveal: "tribunale_voting",

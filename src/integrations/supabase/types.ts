@@ -546,7 +546,7 @@ export type Database = {
         | "finished"
         | "great_reveal"
       mission_state: "pending" | "completed" | "failed"
-      player_role: "capo" | "traitor" | "civilian"
+      player_role: "capo" | "traitor" | "faithful"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -689,7 +689,7 @@ export const Constants = {
         "great_reveal",
       ],
       mission_state: ["pending", "completed", "failed"],
-      player_role: ["capo", "traitor", "civilian"],
+      player_role: ["capo", "traitor", "faithful"],
     },
   },
 } as const
