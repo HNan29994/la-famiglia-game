@@ -505,11 +505,12 @@ function MurderMissionCard({ assignment, gameId, night, allPlayers }: any) {
   return (
     <div className="mt-3 bg-[var(--blood)]/15 border border-[var(--blood)] rounded-sm p-4">
       <div className="text-[10px] tracking-widest uppercase text-[var(--blood)] mb-2">
-        Bonus · Murder Mission · +4 pt
+        Bonus Mission · +4 pt
       </div>
       <div className="font-serif text-base leading-snug">
-        Eliminate <span className="font-display text-[var(--blood)]">{targetName.toUpperCase()}</span>.
-        Get them to take a long drink ({3} fingers) without revealing yourself.
+        Social mission, completed in person: get <span className="font-display text-[var(--blood)]">{targetName.toUpperCase()}</span>
+        {" "}to take a long drink ({3} fingers) — without ever revealing you set them up.
+        This is NOT a vote; only tap when you've actually pulled it off in real life.
       </div>
       {state === "pending" && (
         <div className="flex gap-2 mt-3">
@@ -517,13 +518,13 @@ function MurderMissionCard({ assignment, gameId, night, allPlayers }: any) {
             onClick={kill}
             className="flex-1 text-xs font-display tracking-widest uppercase py-2 rounded-sm bg-[var(--blood)] text-foreground"
           >
-            ✓ Confirm kill
+            ✓ Mission Complete
           </button>
           <button
             onClick={abandon}
             className="flex-1 text-xs font-display tracking-widest uppercase py-2 rounded-sm border border-[var(--gold)]/30 text-gold"
           >
-            Abandon
+            Skip Mission
           </button>
         </div>
       )}
@@ -670,6 +671,15 @@ function TraitorListOverlay({
           </div>
           <div className="text-xs font-serif italic text-muted-foreground mt-1">
             You will not see this list again.
+          </div>
+        </div>
+        <div className="mt-3 bg-card border border-gold rounded-sm p-3 text-center">
+          <div className="font-display text-[10px] tracking-widest uppercase text-gold">
+            💬 WhatsApp Group
+          </div>
+          <div className="text-xs font-serif italic text-muted-foreground mt-1">
+            Set up your traitors-only WhatsApp group with the names above
+            <span className="not-italic"> </span>before tapping confirm.
           </div>
         </div>
         <button
@@ -971,16 +981,13 @@ function GreatRevealMirror({ gameId, allPlayers }: { gameId: string; allPlayers:
 
 function roleColor(r: string) {
   if (r === "traitor") return "text-[var(--blood)]";
-  if (r === "capo") return "text-gold";
   return "text-muted-foreground";
 }
 function roleEmoji(r: string) {
   if (r === "traitor") return "🐍";
-  if (r === "capo") return "🔫";
   return "👤";
 }
 function roleItalian(r: string) {
   if (r === "traitor") return "Il Traditore";
-  if (r === "capo") return "Il Capo";
   return "Il Fideli";
 }
