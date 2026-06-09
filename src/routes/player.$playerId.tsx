@@ -22,10 +22,6 @@ function PlayerView() {
   const [player, setPlayer] = useState<any>(null);
   const [assignment, setAssignment] = useState<any>(null);
   const [allPlayers, setAllPlayers] = useState<any[]>([]);
-  const [suspectTip, setSuspectTip] = useState<string[] | null>(null);
-  const [myArrest, setMyArrest] = useState<any>(null);
-  const [myAlliance, setMyAlliance] = useState<any>(null);
-  const [incomingAlliance, setIncomingAlliance] = useState<any>(null);
   const [myVotes, setMyVotes] = useState<any[]>([]);
   const [revealed, setRevealed] = useState(false);
   const [murders, setMurders] = useState<any[]>([]);
@@ -45,14 +41,6 @@ function PlayerView() {
       setAssignment(a);
       const { data: ta } = await supabase.from("role_assignments").select("player_id, role").eq("game_id", p.game_id).eq("night", g.current_night).eq("role", "traitor");
       setTraitorAssignments(ta || []);
-      const { data: tip } = await supabase.from("suspect_tips").select("*").eq("game_id", p.game_id).eq("night", g.current_night).eq("capo_id", playerId).maybeSingle();
-      setSuspectTip(tip?.suspect_ids ?? null);
-      const { data: ar } = await supabase.from("arrests").select("*").eq("game_id", p.game_id).eq("night", g.current_night).eq("capo_id", playerId).maybeSingle();
-      setMyArrest(ar);
-      const { data: outAl } = await supabase.from("alliances").select("*").eq("game_id", p.game_id).eq("night", g.current_night).eq("requester_id", playerId).order("created_at", { ascending: false }).limit(1);
-      const { data: inAl } = await supabase.from("alliances").select("*").eq("game_id", p.game_id).eq("night", g.current_night).eq("partner_id", playerId).eq("status", "pending").order("created_at", { ascending: false }).limit(1);
-      setMyAlliance(outAl?.[0] || null);
-      setIncomingAlliance(inAl?.[0] || null);
       const { data: v } = await supabase.from("votes").select("*").eq("game_id", p.game_id).eq("night", g.current_night).eq("voter_id", playerId);
       setMyVotes(v || []);
       const { data: m } = await supabase.from("murders").select("*").eq("game_id", p.game_id).eq("night", g.current_night);
@@ -81,8 +69,7 @@ function PlayerView() {
   const readyLabel: Record<string, string> = {
     setup: `Begin Notte ${game.current_night}`,
     night_active: "Ready for Il Tribunale",
-    tribunale_missions: "Continue · Reveal arrests",
-    tribunale_arrests: "Continue · Open discussion",
+    tribunale_missions: "Continue · Open discussion",
     tribunale_discussion: game.current_night === 3 ? "Begin The Great Reveal" : "Open the vote",
     great_reveal: "Open the final vote",
     tribunale_voting: "I've voted",
@@ -211,29 +198,6 @@ function PlayerView() {
                   gameId={game.id}
                   night={game.current_night}
                   allPlayers={allPlayers}
-                />
-              )}
-              {assignment.role === "capo" && suspectTip && (
-                <SuspectTipCard suspectIds={suspectTip} allPlayers={allPlayers} />
-              )}
-              {assignment.role === "capo" && game.phase === "night_active" && (
-                <ArrestCard
-                  gameId={game.id}
-                  night={game.current_night}
-                  capoId={playerId}
-                  allPlayers={allPlayers}
-                  existing={myArrest}
-                />
-              )}
-              {game.phase === "night_active" && (
-                <AllianceCard
-                  gameId={game.id}
-                  night={game.current_night}
-                  me={player}
-                  allPlayers={allPlayers}
-                  myAlliance={myAlliance}
-                  incoming={incomingAlliance}
-                  refresh={refresh}
                 />
               )}
               {game.phase === "tribunale_discussion" && (
