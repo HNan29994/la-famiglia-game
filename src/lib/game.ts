@@ -263,8 +263,7 @@ export async function toggleReady(
 const NEXT_PHASE: Record<string, string> = {
   setup: "night_active",
   night_active: "tribunale_missions",
-  tribunale_missions: "tribunale_arrests",
-  tribunale_arrests: "tribunale_discussion",
+  tribunale_missions: "tribunale_discussion",
   tribunale_discussion: "tribunale_voting",
   tribunale_voting: "tribunale_reveal",
   great_reveal: "tribunale_voting",
