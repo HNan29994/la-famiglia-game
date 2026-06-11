@@ -507,6 +507,9 @@ function MurderMissionCard({ assignment, gameId, night, allPlayers }: any) {
       <div className="text-[10px] tracking-widest uppercase text-[var(--blood)] mb-2">
         Bonus Mission · +4 pt
       </div>
+      <div className="text-[10px] font-serif italic text-muted-foreground mb-2">
+        This is a personal social mission — separate from the group murder vote.
+      </div>
       <div className="font-serif text-base leading-snug">
         Social mission, completed in person: get <span className="font-display text-[var(--blood)]">{targetName.toUpperCase()}</span>
         {" "}to take a long drink ({3} fingers) — without ever revealing you set them up.
