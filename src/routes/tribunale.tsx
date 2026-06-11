@@ -128,13 +128,13 @@ function TribunalePage() {
         <GreatRevealEngine gameId={gameId} playerById={playerById} />
       )}
       {game.phase === "tribunale_voting" && (
-        <VotingPhase players={players} votes={votes} />
+        <VotingPhase players={players} votes={votes} night={game.current_night} />
       )}
       {game.phase === "tribunale_reveal" && (
-        <RoleReveal assignments={assignments} playerById={playerById} night={game.current_night} />
+        <RoleReveal assignments={assignments} playerById={playerById} players={players} votes={votes} night={game.current_night} />
       )}
       {game.phase === "tribunale_leaderboard" && (
-        <NightLeaderboard assignments={assignments} playerById={playerById} />
+        <NightLeaderboard assignments={assignments} playerById={playerById} night={game.current_night} />
       )}
       {game.phase === "tribunale_drinks" && (
         <DrinkPhase gameId={gameId} night={game.current_night} assignments={assignments} players={players} />
@@ -198,10 +198,11 @@ function DiscussionPhase({ timer, onNext }: any) {
   );
 }
 
-function VotingPhase({ players, votes, onClose }: any) {
+function VotingPhase({ players, votes, night, onClose }: any) {
   const voters = new Set(votes.map((v: any) => v.voter_id));
+  const nextLabel = night === 3 ? "Reveal All Roles →" : "Close the Vote →";
   return (
-    <PhaseShell title="" onNext={onClose} nextLabel="Reveal All Roles →">
+    <PhaseShell title="" onNext={onClose} nextLabel={nextLabel}>
       <div className="bg-card border border-gold rounded-sm p-6 text-center">
         <div className="font-display text-5xl text-shimmer">{voters.size}/{players.length}</div>
         <div className="text-sm font-serif italic text-muted-foreground mt-3">Players are voting on their own phones…</div>
@@ -217,40 +218,89 @@ function VotingPhase({ players, votes, onClose }: any) {
   );
 }
 
-function RoleReveal({ assignments, playerById, night, onNext }: any) {
+function RoleReveal({ assignments, playerById, players, votes, night, onNext }: any) {
+  const showRoles = night === 3;
+  const voteCount: Record<string, number> = {};
+  (votes || []).forEach((v: any) => {
+    voteCount[v.target_id] = (voteCount[v.target_id] || 0) + 1;
+  });
+  // Banished this night = players banished with banished_night === current night
+  const banishedThisNight = (players || []).filter(
+    (p: any) => p.banished && p.banished_night === night,
+  );
+  const sortedTallies = Object.entries(voteCount).sort((a, b) => b[1] - a[1]);
+
   return (
-    <PhaseShell title="THE REVEAL" onNext={onNext} nextLabel="Tally the Score →">
-      {night === 2 && (
-        <div className="bg-[var(--blood)]/20 border border-[var(--blood)] rounded-sm p-3 mb-4 text-center">
-          <div className="font-display text-sm text-[var(--blood)] tracking-widest">👁️ IL TRADITORE DOPPIO</div>
-          <div className="text-xs font-serif italic mt-1">One traitor was secretly a Capo…</div>
+    <PhaseShell title={showRoles ? "THE GREAT REVEAL" : "IL VERDETTO"} onNext={onNext} nextLabel="Tally the Score →">
+      {banishedThisNight.length > 0 && (
+        <div className="bg-[var(--blood)]/15 border border-[var(--blood)] rounded-sm p-4 mb-4">
+          <div className="text-center text-[10px] tracking-[0.4em] uppercase text-[var(--blood)] mb-3">
+            Banished Tonight
+          </div>
+          <div className="space-y-2">
+            {banishedThisNight.map((p: any) => (
+              <div key={p.id} className="flex justify-between items-center font-serif border-b border-[var(--blood)]/20 py-2">
+                <span>{p.name}</span>
+                <span className="font-display text-sm tracking-widest uppercase text-[var(--blood)]">
+                  🔒 Bandito — role sealed
+                </span>
+              </div>
+            ))}
+          </div>
         </div>
       )}
-      <div className="space-y-2">
-        {assignments.map((a: any, i: number) => {
-          const meta = roleMeta(a.role as Role);
-          const player = playerById[a.player_id];
-          const banishedHere = player?.banished && !player?.banished_revealed;
-          return (
-            <div key={a.id} className="flex justify-between items-center bg-card border border-[var(--gold)]/30 rounded-sm p-3 animate-fade-up" style={{ animationDelay: `${i * 60}ms` }}>
-              <span className="font-serif">{player?.name}</span>
-              {banishedHere ? (
-                <span className="font-display text-sm tracking-widest uppercase text-[var(--blood)]">🔒 Bandito</span>
-              ) : (
+
+      {sortedTallies.length > 0 && (
+        <div className="bg-card border border-[var(--gold)]/30 rounded-sm p-4 mb-4">
+          <div className="text-center text-[10px] tracking-[0.4em] uppercase text-gold mb-3">
+            Vote Tallies
+          </div>
+          <div className="space-y-1">
+            {sortedTallies.map(([pid, c]) => (
+              <div key={pid} className="flex justify-between text-sm font-serif border-b border-[var(--gold)]/10 py-1">
+                <span>{playerById[pid]?.name || "—"}</span>
+                <span className="font-display text-gold">{c}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {!showRoles && (
+        <div className="text-center text-xs font-serif italic text-muted-foreground mt-2">
+          Roles revealed at Night 3 · The Great Reveal.
+        </div>
+      )}
+
+      {showRoles && (
+        <div className="space-y-2">
+          {assignments.map((a: any, i: number) => {
+            const meta = roleMeta(a.role as Role);
+            const player = playerById[a.player_id];
+            return (
+              <div key={a.id} className="flex justify-between items-center bg-card border border-[var(--gold)]/30 rounded-sm p-3 animate-fade-up" style={{ animationDelay: `${i * 60}ms` }}>
+                <span className="font-serif">{player?.name}</span>
                 <span className={`font-display text-sm tracking-widest uppercase ${meta.color}`}>{meta.emoji} {meta.italian}</span>
-              )}
-            </div>
-          );
-        })}
-      </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </PhaseShell>
   );
 }
 
-function NightLeaderboard({ assignments, playerById, onNext }: any) {
+function NightLeaderboard({ assignments, playerById, night, onNext }: any) {
   const sorted = [...assignments].sort((a, b) => b.night_points - a.night_points);
   return (
     <PhaseShell title="NIGHT CLASSIFICA" onNext={onNext} nextLabel="Distribute Drinks →">
+      {night === 3 && (
+        <div className="bg-[var(--blood)]/15 border border-[var(--blood)] rounded-sm p-3 mb-3 text-center">
+          <div className="font-display text-sm tracking-widest text-[var(--blood)]">
+            ⚡ NOTTE FINALE — All points doubled tonight.
+          </div>
+        </div>
+      )}
       <div className="space-y-1">
         {sorted.map((a: any, i: number) => (
           <div key={a.id} className={`flex justify-between items-center py-2 px-3 rounded-sm ${i === 0 ? "bg-gradient-gold text-primary-foreground" : "border-b border-[var(--gold)]/10"}`}>
