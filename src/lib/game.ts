@@ -138,8 +138,16 @@ export async function scoreNight(gameId: string, night: number) {
   votes?.forEach((v: any) => {
     voteCount[v.target_id] = (voteCount[v.target_id] || 0) + 1;
   });
+  // Only the single top-voted player is banished per night. Ties are
+  // broken randomly between joint-top players.
   const sortedTargets = Object.entries(voteCount).sort((a, b) => b[1] - a[1]);
-  const votedOut = new Set(sortedTargets.slice(0, 4).map(([id]) => id));
+  const votedOut = new Set<string>();
+  if (sortedTargets.length > 0) {
+    const topCount = sortedTargets[0][1];
+    const topIds = sortedTargets.filter(([, c]) => c === topCount).map(([id]) => id);
+    const pick = topIds[Math.floor(Math.random() * topIds.length)];
+    votedOut.add(pick);
+  }
 
   // Per-player points
   const pointsByPlayer: Record<string, number> = {};
@@ -292,7 +300,8 @@ export async function tryAdvancePhase(gameId: string) {
   const { count: playerCount } = await supabase
     .from("players")
     .select("*", { count: "exact", head: true })
-    .eq("game_id", gameId);
+    .eq("game_id", gameId)
+    .eq("banished", false);
 
   const needed = Math.floor((playerCount ?? 0) / 2) + 1;
   if ((readyCount ?? 0) < needed) return;
