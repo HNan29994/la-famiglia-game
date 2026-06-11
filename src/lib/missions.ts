@@ -28,7 +28,7 @@ export const TRAITOR_MISSIONS = [
 
 export const SPECIAL_EVENTS: Record<number, { emoji: string; name: string; description: string }> = {
   1: { emoji: "🃏", name: "Benvenuti", description: "Standard rules apply. Welcome to the family." },
-  2: { emoji: "👁️", name: "Il Traditore Doppio", description: "One traitor was secretly a Capo — revealed at the vote." },
+  2: { emoji: "🔥", name: "La Notte Cresce", description: "Night 2 · The stakes rise. Points are heating up." },
   3: { emoji: "🔥", name: "La Resa dei Conti", description: "Points doubled tonight. If not all 4 traitors are voted out, Il Fideli lose drink distribution rights." },
 };
 
