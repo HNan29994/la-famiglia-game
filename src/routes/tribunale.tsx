@@ -115,12 +115,16 @@ function TribunalePage() {
         )}
 
       {/* Phase router */}
+      {game.phase === "armory" && (
+        <ArmoryPhaseView gameId={gameId} night={game.current_night} players={players} />
+      )}
       {game.phase === "tribunale_missions" && (
         <MissionReport assignments={assignments} playerById={playerById} />
       )}
       {game.phase === "tribunale_discussion" && (
         <>
           <DiscussionPhase timer={timer} />
+          <SottoSospettoLog gameId={gameId} night={game.current_night} playerById={playerById} />
           <GiuroBoard giuros={giuros} playerById={playerById} />
         </>
       )}
