@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { AppHeader } from "@/components/AppHeader";
 import { Ornament } from "@/components/Ornament";
-import { getStoredGameId, setStoredGameId } from "@/lib/game";
+import { getStoredGameId, setStoredGameId, resolveMurderVote, recordArmoryWinner } from "@/lib/game";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/admin")({
@@ -207,10 +207,16 @@ function LobbyView({ gameId, onReset }: { gameId: string; onReset: () => void })
           if (!confirm("Permanently delete this game and all its data? This cannot be undone.")) return;
           const tables = [
             "alliances", "arrests", "drink_assignments", "giuros",
-            "murders", "phase_ready", "phase_transitions", "role_assignments",
-            "suspect_tips", "votes", "players",
+            "murders", "murder_votes", "armory_rounds", "phase_ready",
+            "phase_transitions", "role_assignments", "sotto_sospetto_votes",
+            "sotto_sospetto", "suspect_tips", "votes", "players",
           ];
-          await Promise.all(tables.map((t) => (supabase as any).from(t).delete().eq("game_id", gameId)));
+          // sotto_sospetto_votes uses sospetto_id, not game_id — cascade from sotto_sospetto handles it.
+          await Promise.all(
+            tables
+              .filter((t) => t !== "sotto_sospetto_votes")
+              .map((t) => (supabase as any).from(t).delete().eq("game_id", gameId)),
+          );
           await supabase.from("games").delete().eq("id", gameId);
           localStorage.removeItem("famiglia_game_id");
           window.location.href = "/admin";
