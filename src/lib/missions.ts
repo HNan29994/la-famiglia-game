@@ -16,14 +16,14 @@ export const FAITHFUL_MISSIONS = [
 ];
 
 export const TRAITOR_MISSIONS = [
-  "Get one of Il Fideli to do a dare without them realising it's a mission",
+  "Get one of the Fedeli to do a dare without them realising it's a mission",
   "Say 'la famiglia' out loud in a group of 5+ without anyone calling it out",
   "Shake hands formally with every other traitor without anyone noticing",
   "Get someone to agree to vote for a specific person tonight",
   "Plant a wine glass at someone else's seat without being noticed",
-  "Whisper a fake secret to two different Il Fideli",
-  "Convince a Fideli to accuse another innocent player publicly",
-  "Get a Fideli to buy you a drink while you steer the conversation away from the game",
+  "Whisper a fake secret to two different Fedeli",
+  "Convince a Fedele to accuse another innocent player publicly",
+  "Get a Fedele to buy you a drink while you steer the conversation away from the game",
 ];
 
 export const SPECIAL_EVENTS: Record<number, { emoji: string; name: string; description: string }> = {

@@ -66,6 +66,61 @@ export type Database = {
           },
         ]
       }
+      armory_rounds: {
+        Row: {
+          created_at: string
+          game_id: string
+          id: string
+          is_winner: boolean
+          night: number
+          player_a_id: string
+          player_b_id: string
+          scored: boolean
+        }
+        Insert: {
+          created_at?: string
+          game_id: string
+          id?: string
+          is_winner?: boolean
+          night: number
+          player_a_id: string
+          player_b_id: string
+          scored?: boolean
+        }
+        Update: {
+          created_at?: string
+          game_id?: string
+          id?: string
+          is_winner?: boolean
+          night?: number
+          player_a_id?: string
+          player_b_id?: string
+          scored?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "armory_rounds_game_id_fkey"
+            columns: ["game_id"]
+            isOneToOne: false
+            referencedRelation: "games"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "armory_rounds_player_a_id_fkey"
+            columns: ["player_a_id"]
+            isOneToOne: false
+            referencedRelation: "players"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "armory_rounds_player_b_id_fkey"
+            columns: ["player_b_id"]
+            isOneToOne: false
+            referencedRelation: "players"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       arrests: {
         Row: {
           capo_id: string
@@ -175,6 +230,8 @@ export type Database = {
           created_at: string
           current_night: number
           id: string
+          morning_revealed: boolean
+          morning_revealed_night: number | null
           name: string
           night3_game_name: string
           phase: Database["public"]["Enums"]["game_phase"]
@@ -183,6 +240,8 @@ export type Database = {
           created_at?: string
           current_night?: number
           id?: string
+          morning_revealed?: boolean
+          morning_revealed_night?: number | null
           name?: string
           night3_game_name?: string
           phase?: Database["public"]["Enums"]["game_phase"]
@@ -191,6 +250,8 @@ export type Database = {
           created_at?: string
           current_night?: number
           id?: string
+          morning_revealed?: boolean
+          morning_revealed_night?: number | null
           name?: string
           night3_game_name?: string
           phase?: Database["public"]["Enums"]["game_phase"]
@@ -232,6 +293,55 @@ export type Database = {
           target_id?: string
         }
         Relationships: []
+      }
+      murder_votes: {
+        Row: {
+          created_at: string
+          game_id: string
+          id: string
+          night: number
+          traitor_id: string
+          victim_id: string
+        }
+        Insert: {
+          created_at?: string
+          game_id: string
+          id?: string
+          night: number
+          traitor_id: string
+          victim_id: string
+        }
+        Update: {
+          created_at?: string
+          game_id?: string
+          id?: string
+          night?: number
+          traitor_id?: string
+          victim_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "murder_votes_game_id_fkey"
+            columns: ["game_id"]
+            isOneToOne: false
+            referencedRelation: "games"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "murder_votes_traitor_id_fkey"
+            columns: ["traitor_id"]
+            isOneToOne: false
+            referencedRelation: "players"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "murder_votes_victim_id_fkey"
+            columns: ["victim_id"]
+            isOneToOne: false
+            referencedRelation: "players"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       murders: {
         Row: {
@@ -319,6 +429,7 @@ export type Database = {
           id: string
           name: string
           pin: string | null
+          state: Database["public"]["Enums"]["player_state"]
           total_points: number
         }
         Insert: {
@@ -331,6 +442,7 @@ export type Database = {
           id?: string
           name: string
           pin?: string | null
+          state?: Database["public"]["Enums"]["player_state"]
           total_points?: number
         }
         Update: {
@@ -343,6 +455,7 @@ export type Database = {
           id?: string
           name?: string
           pin?: string | null
+          state?: Database["public"]["Enums"]["player_state"]
           total_points?: number
         }
         Relationships: [
@@ -424,6 +537,103 @@ export type Database = {
           {
             foreignKeyName: "role_assignments_player_id_fkey"
             columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "players"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sotto_sospetto: {
+        Row: {
+          accused_id: string
+          behaviour: string
+          caller_id: string
+          created_at: string
+          game_id: string
+          id: string
+          night: number
+          resolved_at: string | null
+          result: string | null
+        }
+        Insert: {
+          accused_id: string
+          behaviour: string
+          caller_id: string
+          created_at?: string
+          game_id: string
+          id?: string
+          night: number
+          resolved_at?: string | null
+          result?: string | null
+        }
+        Update: {
+          accused_id?: string
+          behaviour?: string
+          caller_id?: string
+          created_at?: string
+          game_id?: string
+          id?: string
+          night?: number
+          resolved_at?: string | null
+          result?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sotto_sospetto_accused_id_fkey"
+            columns: ["accused_id"]
+            isOneToOne: false
+            referencedRelation: "players"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sotto_sospetto_caller_id_fkey"
+            columns: ["caller_id"]
+            isOneToOne: false
+            referencedRelation: "players"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sotto_sospetto_game_id_fkey"
+            columns: ["game_id"]
+            isOneToOne: false
+            referencedRelation: "games"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sotto_sospetto_votes: {
+        Row: {
+          created_at: string
+          id: string
+          sospetto_id: string
+          vote: string
+          voter_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          sospetto_id: string
+          vote: string
+          voter_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          sospetto_id?: string
+          vote?: string
+          voter_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sotto_sospetto_votes_sospetto_id_fkey"
+            columns: ["sospetto_id"]
+            isOneToOne: false
+            referencedRelation: "sotto_sospetto"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sotto_sospetto_votes_voter_id_fkey"
+            columns: ["voter_id"]
             isOneToOne: false
             referencedRelation: "players"
             referencedColumns: ["id"]
@@ -536,6 +746,7 @@ export type Database = {
       game_phase:
         | "setup"
         | "night_active"
+        | "armory"
         | "tribunale_missions"
         | "tribunale_arrests"
         | "tribunale_discussion"
@@ -547,6 +758,7 @@ export type Database = {
         | "great_reveal"
       mission_state: "pending" | "completed" | "failed"
       player_role: "capo" | "traitor" | "faithful"
+      player_state: "active" | "ghost" | "banished"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -678,6 +890,7 @@ export const Constants = {
       game_phase: [
         "setup",
         "night_active",
+        "armory",
         "tribunale_missions",
         "tribunale_arrests",
         "tribunale_discussion",
@@ -690,6 +903,7 @@ export const Constants = {
       ],
       mission_state: ["pending", "completed", "failed"],
       player_role: ["capo", "traitor", "faithful"],
+      player_state: ["active", "ghost", "banished"],
     },
   },
 } as const

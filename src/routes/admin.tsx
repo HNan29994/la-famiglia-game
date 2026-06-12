@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { AppHeader } from "@/components/AppHeader";
 import { Ornament } from "@/components/Ornament";
-import { getStoredGameId, setStoredGameId } from "@/lib/game";
+import { getStoredGameId, setStoredGameId, resolveMurderVote, recordArmoryWinner } from "@/lib/game";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/admin")({
@@ -188,12 +188,22 @@ function LobbyView({ gameId, onReset }: { gameId: string; onReset: () => void })
       </div>
 
       <Ornament className="mt-10">ROSTER</Ornament>
+      {game && (game.phase === "night_active" || game.phase === "armory") && (
+        <MorningRevealCard game={game} players={players} gameId={gameId} />
+      )}
+      {game && (game.phase === "night_active" || game.phase === "armory") && (
+        <ArmoryAdminCard gameId={gameId} night={game.current_night} players={players} />
+      )}
       <div className="mt-4 grid grid-cols-2 gap-2">
         {players.map((p) => (
           <div key={p.id} className="border border-[var(--gold)]/20 rounded-sm p-2 bg-card/60">
             <div className="font-serif text-sm">{p.name}</div>
             <div className="text-[10px] tracking-widest uppercase text-muted-foreground flex justify-between">
-              <span>{p.total_points}pt</span>
+              <span>
+                {p.total_points}pt
+                {p.state === "ghost" && <span className="ml-2 text-[var(--blood)]">🕯</span>}
+                {p.state === "banished" && <span className="ml-2 text-[var(--blood)]">🔒</span>}
+              </span>
               <span className={p.giuro_used ? "text-[var(--blood)]" : "text-gold"}>
                 Giuro: {p.giuro_used ? "Used" : "Available"}
               </span>
@@ -207,10 +217,16 @@ function LobbyView({ gameId, onReset }: { gameId: string; onReset: () => void })
           if (!confirm("Permanently delete this game and all its data? This cannot be undone.")) return;
           const tables = [
             "alliances", "arrests", "drink_assignments", "giuros",
-            "murders", "phase_ready", "phase_transitions", "role_assignments",
-            "suspect_tips", "votes", "players",
+            "murders", "murder_votes", "armory_rounds", "phase_ready",
+            "phase_transitions", "role_assignments", "sotto_sospetto_votes",
+            "sotto_sospetto", "suspect_tips", "votes", "players",
           ];
-          await Promise.all(tables.map((t) => (supabase as any).from(t).delete().eq("game_id", gameId)));
+          // sotto_sospetto_votes uses sospetto_id, not game_id — cascade from sotto_sospetto handles it.
+          await Promise.all(
+            tables
+              .filter((t) => t !== "sotto_sospetto_votes")
+              .map((t) => (supabase as any).from(t).delete().eq("game_id", gameId)),
+          );
           await supabase.from("games").delete().eq("id", gameId);
           localStorage.removeItem("famiglia_game_id");
           window.location.href = "/admin";
@@ -223,6 +239,133 @@ function LobbyView({ gameId, onReset }: { gameId: string; onReset: () => void })
       <button onClick={() => { if (confirm("End the current game for everyone on this device?")) onReset(); }} className="mt-4 w-full text-[10px] tracking-widest uppercase text-muted-foreground/60 py-2">
         Forget Game on This Device
       </button>
+    </div>
+  );
+}
+
+function MorningRevealCard({ game, players, gameId }: { game: any; players: any[]; gameId: string }) {
+  const [busy, setBusy] = useState(false);
+  const revealed = game.morning_revealed && game.morning_revealed_night === game.current_night;
+  const victim = players.find((p) => p.state === "ghost"); // most recent ghost (display only)
+
+  async function reveal() {
+    setBusy(true);
+    const res = await resolveMurderVote(gameId, game.current_night).catch((e) => {
+      toast.error(e.message); return null;
+    });
+    setBusy(false);
+    if (!res) return;
+    if (res.already) toast("Already revealed.");
+    else if (res.victim_id) toast.success("Victim revealed.");
+    else toast("No murder — Traditori not unanimous.");
+  }
+
+  return (
+    <div className="mt-6 bg-[var(--blood)]/10 border border-[var(--blood)] rounded-sm p-4">
+      <div className="text-[10px] tracking-widest uppercase text-[var(--blood)] mb-2">
+        🌅 Morning Reveal · Notte {game.current_night}
+      </div>
+      {revealed ? (
+        <div className="text-center font-display text-sm tracking-widest text-[var(--blood)]">
+          {victim ? `† ${victim.name?.toUpperCase()} †` : "No one was murdered."}
+        </div>
+      ) : (
+        <button onClick={reveal} disabled={busy}
+          className="w-full font-display tracking-widest text-xs uppercase bg-[var(--blood)] text-foreground py-3 rounded-sm disabled:opacity-50">
+          {busy ? "Revealing…" : "Reveal the Victim"}
+        </button>
+      )}
+      <div className="mt-2 text-[10px] tracking-widest uppercase text-muted-foreground/70 text-center">
+        Tap when all Traditori have submitted their murder vote. Broadcasts to all phones.
+      </div>
+    </div>
+  );
+}
+
+function ArmoryAdminCard({ gameId, night, players }: { gameId: string; night: number; players: any[] }) {
+  const [rounds, setRounds] = useState<any[]>([]);
+  const [a, setA] = useState(""); const [b, setB] = useState("");
+
+  async function refresh() {
+    const { data } = await supabase.from("armory_rounds").select("*").eq("game_id", gameId).eq("night", night).order("created_at");
+    setRounds(data || []);
+  }
+  useEffect(() => {
+    refresh();
+    const ch = supabase.channel(`armory-admin-${gameId}-${night}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "armory_rounds" }, () => refresh())
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [gameId, night]);
+
+  async function addPair() {
+    if (!a || !b || a === b) { toast.error("Pick two different players."); return; }
+    const { error } = await supabase.from("armory_rounds").insert({
+      game_id: gameId, night, player_a_id: a, player_b_id: b,
+    });
+    if (error) toast.error(error.message); else { setA(""); setB(""); }
+  }
+  async function removeRound(id: string) {
+    await supabase.from("armory_rounds").delete().eq("id", id);
+  }
+  async function markWinner(round: any) {
+    const a = players.find((p) => p.id === round.player_a_id);
+    const b = players.find((p) => p.id === round.player_b_id);
+    const banishedNames = [a, b].filter((p) => p?.state === "banished").map((p) => p!.name);
+    let reentry = false;
+    if (banishedNames.length > 0) {
+      reentry = confirm(
+        `${banishedNames.join(" & ")} is banished. Re-enter as a Fedele? OK = re-enter, Cancel = stay banished (still earns +2 pt).`,
+      );
+    }
+    await recordArmoryWinner(round.id, { reentry }).catch((e) => toast.error(e.message));
+    toast.success("Winners recorded · points applied.");
+  }
+
+  const playerName = (id: string) => players.find((p) => p.id === id)?.name || "?";
+
+  return (
+    <div className="mt-4 bg-card border border-gold rounded-sm p-4">
+      <div className="text-[10px] tracking-widest uppercase text-gold mb-2">
+        ⚔ Armory · Notte {night}
+      </div>
+      <div className="space-y-2 mb-3">
+        {rounds.length === 0 && (
+          <div className="text-xs font-serif italic text-muted-foreground text-center">No pairings yet.</div>
+        )}
+        {rounds.map((r) => (
+          <div key={r.id} className={`flex items-center justify-between border rounded-sm p-2 ${r.is_winner ? "border-gold bg-[var(--gold)]/10" : "border-[var(--gold)]/20"}`}>
+            <span className="font-serif text-sm">{playerName(r.player_a_id)} <span className="text-gold/60">+</span> {playerName(r.player_b_id)}</span>
+            <div className="flex gap-1">
+              {r.is_winner ? (
+                <span className="text-[10px] tracking-widest uppercase text-gold">✓ Winner</span>
+              ) : (
+                <button onClick={() => markWinner(r)} className="text-[10px] tracking-widest uppercase border border-gold text-gold px-2 py-1 rounded-sm">
+                  Mark winner
+                </button>
+              )}
+              {!r.scored && (
+                <button onClick={() => removeRound(r.id)} className="text-[10px] tracking-widest uppercase text-[var(--blood)] px-2 py-1">
+                  ✕
+                </button>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="flex gap-2">
+        <select value={a} onChange={(e) => setA(e.target.value)} className="flex-1 bg-input border border-[var(--gold)]/30 rounded-sm py-2 px-2 text-xs font-serif">
+          <option value="">Player A</option>
+          {players.map((p) => (<option key={p.id} value={p.id}>{p.name}</option>))}
+        </select>
+        <select value={b} onChange={(e) => setB(e.target.value)} className="flex-1 bg-input border border-[var(--gold)]/30 rounded-sm py-2 px-2 text-xs font-serif">
+          <option value="">Player B</option>
+          {players.map((p) => (<option key={p.id} value={p.id}>{p.name}</option>))}
+        </select>
+        <button onClick={addPair} className="font-display tracking-widest text-xs uppercase border border-gold text-gold px-3 rounded-sm">
+          + Pair
+        </button>
+      </div>
     </div>
   );
 }
