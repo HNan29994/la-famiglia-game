@@ -83,7 +83,8 @@ function PlayerView() {
 
   const readyLabel: Record<string, string> = {
     setup: `Begin Notte ${game.current_night}`,
-    night_active: "Ready for Il Tribunale",
+    night_active: "Ready for Armory",
+    armory: "Ready for Il Tribunale",
     tribunale_missions: "Continue · Open discussion",
     tribunale_discussion: game.current_night === 3 ? "Begin The Great Reveal" : "Open the vote",
     great_reveal: "Open the final vote",
@@ -95,7 +96,7 @@ function PlayerView() {
 
   // Banished players see a single locked-out view + Il Silenzio. They never
   // see their old role, get no new role, and cannot Giuro.
-  if (player.banished) {
+  if (player.state === "banished") {
     return (
       <div className="min-h-screen px-5 max-w-md mx-auto pb-20">
         <AppHeader subtitle={`${player.name}`} />
