@@ -595,3 +595,78 @@ function GreatRevealEngine({ gameId, playerById }: { gameId: string; playerById:
     </PhaseShell>
   );
 }
+
+function ArmoryPhaseView({ gameId, night, players }: { gameId: string; night: number; players: any[] }) {
+  const [rounds, setRounds] = useState<any[]>([]);
+  useEffect(() => {
+    let mounted = true;
+    async function refresh() {
+      const { data } = await supabase.from("armory_rounds").select("*").eq("game_id", gameId).eq("night", night).order("created_at");
+      if (mounted) setRounds(data || []);
+    }
+    refresh();
+    const ch = supabase.channel(`armory-trib-${gameId}-${night}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "armory_rounds" }, () => refresh())
+      .subscribe();
+    return () => { mounted = false; supabase.removeChannel(ch); };
+  }, [gameId, night]);
+  const nameOf = (id: string) => players.find((p) => p.id === id)?.name || "?";
+  return (
+    <PhaseShell title="⚔ THE ARMORY">
+      {rounds.length === 0 ? (
+        <div className="text-center font-serif italic text-muted-foreground">
+          Admin is setting up the pairings…
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {rounds.map((r) => (
+            <div key={r.id} className={`flex justify-between items-center bg-card border rounded-sm p-3 ${r.is_winner ? "border-gold bg-[var(--gold)]/10" : "border-[var(--gold)]/20"}`}>
+              <span className="font-serif">{nameOf(r.player_a_id)} <span className="text-gold/60">+</span> {nameOf(r.player_b_id)}</span>
+              <span className={`font-display text-xs tracking-widest uppercase ${r.is_winner ? "text-gold" : "text-muted-foreground"}`}>
+                {r.is_winner ? "✓ Winners · Immune" : "—"}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+      <div className="mt-3 text-center text-[10px] tracking-widest uppercase text-muted-foreground/70 italic">
+        Winners grant themselves immunity from the Traitor murder vote.
+      </div>
+    </PhaseShell>
+  );
+}
+
+function SottoSospettoLog({ gameId, night, playerById }: { gameId: string; night: number; playerById: Record<string, any> }) {
+  const [ss, setSs] = useState<any | null>(null);
+  useEffect(() => {
+    let mounted = true;
+    async function refresh() {
+      const { data } = await supabase.from("sotto_sospetto").select("*").eq("game_id", gameId).eq("night", night).maybeSingle();
+      if (mounted) setSs(data);
+    }
+    refresh();
+    const ch = supabase.channel(`ss-trib-${gameId}-${night}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "sotto_sospetto" }, () => refresh())
+      .subscribe();
+    return () => { mounted = false; supabase.removeChannel(ch); };
+  }, [gameId, night]);
+  if (!ss) return null;
+  const caller = playerById[ss.caller_id]?.name;
+  const accused = playerById[ss.accused_id]?.name;
+  return (
+    <div className="mt-6 bg-card border border-gold rounded-sm p-5">
+      <div className="text-center text-[10px] tracking-[0.4em] uppercase text-gold mb-3">
+        🕵 Sotto Sospetto
+      </div>
+      <div className="text-center font-serif text-sm">
+        {caller} → <span className="font-display tracking-widest uppercase text-[var(--blood)]">{accused}</span>
+      </div>
+      <div className="mt-2 text-sm font-serif italic text-center">"{ss.behaviour}"</div>
+      {ss.resolved_at && (
+        <div className="mt-3 text-center font-display tracking-widest text-sm uppercase text-gold">
+          Verdetto: {ss.result === "guilty" ? "COLPEVOLE" : "NON COLPEVOLE"}
+        </div>
+      )}
+    </div>
+  );
+}
