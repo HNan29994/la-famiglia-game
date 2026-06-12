@@ -186,12 +186,28 @@ function PlayerView() {
         allPlayers={allPlayers}
       />
 
+      {/* Morning Reveal — full-screen victim announcement */}
+      {game.morning_revealed && game.morning_revealed_night === game.current_night && (
+        <MorningRevealBanner murders={murders} allPlayers={allPlayers} meId={playerId} />
+      )}
+
+      {/* Sotto Sospetto — active vote overlay for everyone, available always */}
+      {sospetto && !sospetto.resolved_at && (
+        <SottoSospettoVoteOverlay
+          sospetto={sospetto}
+          votes={sospettoVotes}
+          meId={playerId}
+          me={player}
+          allPlayers={allPlayers}
+        />
+      )}
+
       {game.phase === "great_reveal" && (
         <GreatRevealMirror gameId={game.id} allPlayers={allPlayers} />
       )}
 
 
-      {assignment && (game.phase === "night_active" || game.phase.startsWith("tribunale_")) && (
+      {assignment && (game.phase === "night_active" || game.phase === "armory" || game.phase.startsWith("tribunale_")) && (
         <>
           <RoleReveal assignment={assignment} revealed={revealed} onReveal={() => setRevealed(true)} />
           {revealed && assignment.role === "traitor" && !assignment.traitor_list_seen && (
@@ -206,15 +222,30 @@ function PlayerView() {
             <>
               <MissionsCard
                 assignment={assignment}
-                disabled={!game.phase.startsWith("tribunale_") && game.phase !== "night_active"}
+                disabled={!game.phase.startsWith("tribunale_") && game.phase !== "night_active" && game.phase !== "armory"}
               />
-              {assignment.role === "traitor" && assignment.bonus_mission && game.phase === "night_active" && (
-                <MurderMissionCard
-                  assignment={assignment}
+              {assignment.role === "traitor" && game.phase === "night_active" && player.state === "active" && (
+                <MurderVoteCard
                   gameId={game.id}
                   night={game.current_night}
+                  meId={playerId}
+                  allPlayers={allPlayers}
+                  traitorAssignments={traitorAssignments}
+                  murderVotes={murderVotes}
+                  armoryRounds={armoryRounds}
+                />
+              )}
+              {/* Sotto Sospetto trigger — any phase, once per day across the group */}
+              {!sospetto && player.state !== "banished" && (
+                <SottoSospettoTriggerCard
+                  gameId={game.id}
+                  night={game.current_night}
+                  meId={playerId}
                   allPlayers={allPlayers}
                 />
+              )}
+              {sospetto && sospetto.resolved_at && (
+                <SottoSospettoResultCard sospetto={sospetto} allPlayers={allPlayers} />
               )}
               {game.phase === "tribunale_discussion" && (
                 <GiuroCard
@@ -230,8 +261,9 @@ function PlayerView() {
                   gameId={game.id}
                   night={game.current_night}
                   voterId={playerId}
-                  allPlayers={allPlayers.filter((p) => p.id !== playerId)}
+                  allPlayers={allPlayers.filter((p) => p.id !== playerId && p.state !== "banished")}
                   myVotes={myVotes}
+                  canVote={player.state === "active"}
                 />
               )}
               {(game.phase === "tribunale_reveal" || game.phase === "tribunale_leaderboard" || game.phase === "tribunale_drinks") && (
