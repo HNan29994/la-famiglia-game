@@ -483,16 +483,16 @@ function AllianceCard({ gameId, night, me, allPlayers, myAlliance, incoming, ref
   );
 }
 
-function VoteCard({ gameId, night, voterId, allPlayers, myVotes }: any) {
+function VoteCard({ gameId, night, voterId, allPlayers, myVotes, canVote = true }: any) {
   const [selected, setSelected] = useState<string[]>(myVotes.map((v: any) => v.target_id));
   const submitted = myVotes.length > 0;
 
   function toggle(id: string) {
-    if (submitted) return;
+    if (submitted || !canVote) return;
     setSelected((s) => s.includes(id) ? s.filter((x) => x !== id) : s.length < 2 ? [...s, id] : s);
   }
   async function submit() {
-    if (selected.length === 0) return;
+    if (selected.length === 0 || !canVote) return;
     const rows = selected.map((id) => ({ game_id: gameId, night, voter_id: voterId, target_id: id }));
     const { error } = await supabase.from("votes").insert(rows);
     if (error) toast.error(error.message); else toast.success("Vote sealed");
@@ -501,28 +501,33 @@ function VoteCard({ gameId, night, voterId, allPlayers, myVotes }: any) {
   return (
     <div className="mt-6 bg-card border border-gold rounded-sm p-4 animate-glow">
       <div className="text-[10px] tracking-widest uppercase text-gold mb-2">Il Voto · Choose up to 2 traitors</div>
+      {!canVote && (
+        <div className="text-center text-xs font-display tracking-widest uppercase text-[var(--blood)] py-2">
+          🕯 Sei un Fantasma — you cannot vote, but you may watch.
+        </div>
+      )}
       <div className="grid grid-cols-2 gap-2 mt-3">
         {allPlayers.map((p: any) => {
           const isSel = selected.includes(p.id);
           return (
             <button
               key={p.id}
-              disabled={submitted}
+              disabled={submitted || !canVote}
               onClick={() => toggle(p.id)}
-              className={`py-2 px-2 rounded-sm border text-sm font-serif transition ${isSel ? "bg-gradient-gold text-primary-foreground border-transparent" : "border-[var(--gold)]/30 hover:bg-[var(--gold)]/10"}`}
+              className={`py-2 px-2 rounded-sm border text-sm font-serif transition ${isSel ? "bg-gradient-gold text-primary-foreground border-transparent" : "border-[var(--gold)]/30 hover:bg-[var(--gold)]/10"} ${!canVote ? "opacity-40 cursor-not-allowed" : ""}`}
             >
               {p.name}
             </button>
           );
         })}
       </div>
-      {!submitted ? (
+      {canVote && !submitted ? (
         <button onClick={submit} disabled={selected.length === 0} className="mt-4 w-full font-display tracking-widest text-xs uppercase bg-gradient-gold text-primary-foreground py-3 rounded-sm disabled:opacity-40">
           Seal My Vote
         </button>
-      ) : (
+      ) : submitted ? (
         <div className="mt-4 text-center text-xs font-serif italic text-gold">Your vote is sealed. Wait for the reveal…</div>
-      )}
+      ) : null}
     </div>
   );
 }
@@ -536,59 +541,271 @@ function NightSummaryCard({ assignment }: any) {
   );
 }
 
-function MurderMissionCard({ assignment, gameId, night, allPlayers }: any) {
-  const targetName = allPlayers.find((p: any) => p.id === assignment.bonus_target_id)?.name || "your target";
-  const state = assignment.bonus_mission_state as "pending" | "completed" | "failed";
+function MurderVoteCard({
+  gameId, night, meId, allPlayers, traitorAssignments, murderVotes, armoryRounds,
+}: {
+  gameId: string;
+  night: number;
+  meId: string;
+  allPlayers: any[];
+  traitorAssignments: { player_id: string; role: string }[];
+  murderVotes: any[];
+  armoryRounds: any[];
+}) {
+  // Immune = anyone on a winning Armory team this night.
+  const immuneIds = new Set<string>();
+  armoryRounds.filter((r: any) => r.is_winner).forEach((r: any) => {
+    immuneIds.add(r.player_a_id); immuneIds.add(r.player_b_id);
+  });
+  const traitorIds = new Set(traitorAssignments.map((t) => t.player_id));
+  const activeTraitorIds = traitorAssignments
+    .map((t) => allPlayers.find((p) => p.id === t.player_id))
+    .filter((p) => p && p.state === "active")
+    .map((p) => p!.id);
 
-  async function kill() {
-    if (!assignment.bonus_target_id) return;
-    await recordMurder(assignment.id, gameId, night, assignment.player_id, assignment.bonus_target_id);
-    toast.success(`${targetName} sleeps with the fishes.`);
+  // Eligible victims: active, non-traitor, non-immune
+  const candidates = allPlayers.filter(
+    (p) => p.state === "active" && !traitorIds.has(p.id) && !immuneIds.has(p.id),
+  );
+
+  const myVote = murderVotes.find((v: any) => v.traitor_id === meId);
+  const [pick, setPick] = useState<string>(myVote?.victim_id || "");
+
+  async function submit() {
+    if (!pick || myVote) return;
+    const { error } = await supabase.from("murder_votes").insert({
+      game_id: gameId, night, traitor_id: meId, victim_id: pick,
+    });
+    if (error) toast.error(error.message); else toast.success("Vote sealed.");
   }
-  async function abandon() {
-    await abandonMurder(assignment.id);
-    toast("Mission abandoned.");
-  }
+
+  const submittedCount = murderVotes.filter((v: any) => activeTraitorIds.includes(v.traitor_id)).length;
 
   return (
     <div className="mt-3 bg-[var(--blood)]/15 border border-[var(--blood)] rounded-sm p-4">
-      <div className="text-[10px] tracking-widest uppercase text-[var(--blood)] mb-2">
-        Bonus Mission · +4 pt
+      <div className="text-[10px] tracking-widest uppercase text-[var(--blood)] mb-1">
+        🩸 Murder Vote · Unanimous to kill
       </div>
-      <div className="text-[10px] font-serif italic text-muted-foreground mb-2">
-        This is a personal social mission — separate from the group murder vote.
+      <div className="text-[10px] font-serif italic text-muted-foreground mb-3">
+        All active Traditori must pick the same victim. Immune players (Armory winners) are excluded.
+        Result is hidden until the Morning Reveal.
       </div>
-      <div className="font-serif text-base leading-snug">
-        Social mission, completed in person: get <span className="font-display text-[var(--blood)]">{targetName.toUpperCase()}</span>
-        {" "}to take a long drink ({3} fingers) — without ever revealing you set them up.
-        This is NOT a vote; only tap when you've actually pulled it off in real life.
+      <div className="grid grid-cols-2 gap-2">
+        {candidates.map((p: any) => {
+          const sel = pick === p.id;
+          return (
+            <button
+              key={p.id}
+              disabled={!!myVote}
+              onClick={() => setPick(p.id)}
+              className={`py-2 px-2 rounded-sm border text-sm font-serif transition ${sel ? "bg-[var(--blood)] text-foreground border-transparent" : "border-[var(--blood)]/30 hover:bg-[var(--blood)]/10"} ${myVote ? "opacity-60 cursor-not-allowed" : ""}`}
+            >
+              {p.name}
+            </button>
+          );
+        })}
       </div>
-      {state === "pending" && (
-        <div className="flex gap-2 mt-3">
-          <button
-            onClick={kill}
-            className="flex-1 text-xs font-display tracking-widest uppercase py-2 rounded-sm bg-[var(--blood)] text-foreground"
-          >
-            ✓ Mission Complete
-          </button>
-          <button
-            onClick={abandon}
-            className="flex-1 text-xs font-display tracking-widest uppercase py-2 rounded-sm border border-[var(--gold)]/30 text-gold"
-          >
-            Skip Mission
-          </button>
-        </div>
-      )}
-      {state === "completed" && (
+      {!myVote ? (
+        <button onClick={submit} disabled={!pick} className="mt-3 w-full font-display tracking-widest text-xs uppercase bg-[var(--blood)] text-foreground py-3 rounded-sm disabled:opacity-40">
+          Seal Murder Vote
+        </button>
+      ) : (
         <div className="mt-3 text-center text-xs font-display tracking-widest text-[var(--blood)]">
-          KILL CONFIRMED · POURS REVEALED AT IL TRIBUNALE
+          ✓ Your vote sealed · {submittedCount}/{activeTraitorIds.length} Traditori voted
         </div>
       )}
-      {state === "failed" && (
-        <div className="mt-3 text-center text-xs font-display tracking-widest text-muted-foreground">
-          MISSION ABANDONED
+      {immuneIds.size > 0 && (
+        <div className="mt-2 text-[10px] tracking-widest uppercase text-gold/70 text-center">
+          Immune tonight: {[...immuneIds].map((id) => allPlayers.find((p) => p.id === id)?.name).filter(Boolean).join(" · ")}
         </div>
       )}
+    </div>
+  );
+}
+
+function MorningRevealBanner({ murders, allPlayers, meId }: { murders: any[]; allPlayers: any[]; meId: string }) {
+  const victim = murders[0] ? allPlayers.find((p) => p.id === murders[0].victim_id) : null;
+  if (!victim) {
+    return (
+      <div className="mt-4 bg-card border border-gold rounded-sm p-5 text-center">
+        <div className="text-3xl mb-2">🌅</div>
+        <div className="font-display text-sm tracking-[0.4em] uppercase text-gold">Morning Reveal</div>
+        <div className="mt-2 font-serif italic text-muted-foreground">
+          The Traditori could not agree. No one was murdered tonight.
+        </div>
+      </div>
+    );
+  }
+  const isMe = victim.id === meId;
+  return (
+    <div className="mt-4 bg-gradient-to-b from-[var(--blood)]/30 to-[var(--ink)] border border-[var(--blood)] rounded-sm p-6 text-center shadow-dramatic animate-reveal">
+      <div className="text-4xl mb-2">†</div>
+      <div className="font-display text-xs tracking-[0.4em] uppercase text-[var(--blood)] mb-2">
+        Morning Reveal · Notte scorsa
+      </div>
+      <div className="font-display text-3xl tracking-[0.3em] uppercase text-[var(--blood)] text-shadow-gold">
+        {victim.name?.toUpperCase()}{isMe ? " (YOU)" : ""}
+      </div>
+      <div className="mt-3 text-xs font-serif italic text-muted-foreground">
+        Sleeps with the fishes. They walk among us still — as a Fantasma.
+      </div>
+    </div>
+  );
+}
+
+function SottoSospettoTriggerCard({
+  gameId, night, meId, allPlayers,
+}: { gameId: string; night: number; meId: string; allPlayers: any[] }) {
+  const [open, setOpen] = useState(false);
+  const [target, setTarget] = useState("");
+  const [behaviour, setBehaviour] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  const targetable = allPlayers.filter((p) => p.id !== meId);
+
+  async function submit() {
+    const b = behaviour.trim();
+    if (!target || !b) return;
+    setSubmitting(true);
+    const { error } = await supabase.from("sotto_sospetto").insert({
+      game_id: gameId, night, caller_id: meId, accused_id: target, behaviour: b,
+    });
+    setSubmitting(false);
+    if (error) toast.error(error.code === "23505" ? "Sotto Sospetto already used today." : error.message);
+    else { setOpen(false); setTarget(""); setBehaviour(""); toast.success("Sotto Sospetto called."); }
+  }
+
+  return (
+    <div className="mt-3 bg-card border border-gold rounded-sm p-4">
+      <div className="text-[10px] tracking-widest uppercase text-gold mb-1">
+        🕵 Sotto Sospetto · Once per day
+      </div>
+      <div className="text-[10px] font-serif italic text-muted-foreground mb-3">
+        Call out a suspicious player. Everyone votes Guilty / Not Guilty.
+        Guilty → accused finishes their vessel. Not Guilty / tie → you finish yours.
+      </div>
+      {!open ? (
+        <button onClick={() => setOpen(true)} className="w-full font-display tracking-widest text-xs uppercase border border-gold text-gold py-3 rounded-sm">
+          Invoke Sotto Sospetto
+        </button>
+      ) : (
+        <div className="space-y-3">
+          <select value={target} onChange={(e) => setTarget(e.target.value)}
+            className="w-full bg-input border border-[var(--gold)]/30 rounded-sm py-2 px-3 font-serif text-sm">
+            <option value="">Choose the accused…</option>
+            {targetable.map((p) => (<option key={p.id} value={p.id}>{p.name}</option>))}
+          </select>
+          <textarea value={behaviour} onChange={(e) => setBehaviour(e.target.value)}
+            placeholder="Describe the suspicious behaviour…" rows={3} maxLength={300}
+            className="w-full bg-input border border-[var(--gold)]/30 rounded-sm py-2 px-3 font-serif text-sm" />
+          <div className="flex gap-2">
+            <button onClick={submit} disabled={!target || !behaviour.trim() || submitting}
+              className="flex-1 font-display tracking-widest text-xs uppercase bg-gradient-gold text-primary-foreground py-3 rounded-sm disabled:opacity-40">
+              {submitting ? "…" : "Accuse"}
+            </button>
+            <button onClick={() => setOpen(false)}
+              className="flex-1 font-display tracking-widest text-xs uppercase border border-[var(--gold)]/30 text-gold py-3 rounded-sm">
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SottoSospettoVoteOverlay({
+  sospetto, votes, meId, me, allPlayers,
+}: { sospetto: any; votes: any[]; meId: string; me: any; allPlayers: any[] }) {
+  const caller = allPlayers.find((p) => p.id === sospetto.caller_id);
+  const accused = allPlayers.find((p) => p.id === sospetto.accused_id);
+  const eligible = allPlayers.filter((p) => p.state !== "banished" && p.id !== sospetto.caller_id);
+  const myVote = votes.find((v) => v.voter_id === meId);
+  const canVote = me.state !== "banished" && meId !== sospetto.caller_id;
+
+  async function vote(value: "guilty" | "not_guilty") {
+    if (!canVote || myVote) return;
+    const { error } = await supabase.from("sotto_sospetto_votes").insert({
+      sospetto_id: sospetto.id, voter_id: meId, vote: value,
+    });
+    if (error) toast.error(error.message);
+  }
+
+  // Auto-resolve when all eligible voted (any client may race; constraint protects)
+  useEffect(() => {
+    (async () => {
+      if (sospetto.resolved_at) return;
+      const voterIds = new Set(votes.map((v: any) => v.voter_id));
+      const allVoted = eligible.every((p) => voterIds.has(p.id));
+      if (!allVoted) return;
+      const guilty = votes.filter((v: any) => v.vote === "guilty").length;
+      const notGuilty = votes.filter((v: any) => v.vote === "not_guilty").length;
+      const result = guilty > notGuilty ? "guilty" : "not_guilty";
+      await supabase
+        .from("sotto_sospetto")
+        .update({ result, resolved_at: new Date().toISOString() } as any)
+        .eq("id", sospetto.id)
+        .is("resolved_at", null);
+    })();
+  }, [votes.length, eligible.length, sospetto.id, sospetto.resolved_at]);
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-sm flex items-center justify-center px-5">
+      <div className="w-full max-w-md bg-gradient-to-b from-card to-[var(--ink)] border border-gold rounded-sm p-6 shadow-dramatic animate-reveal">
+        <div className="text-center text-4xl mb-2">🕵</div>
+        <div className="text-center font-display text-sm tracking-[0.4em] uppercase text-gold mb-3">
+          Sotto Sospetto
+        </div>
+        <div className="text-center text-xs font-serif italic text-muted-foreground mb-3">
+          {caller?.name} accuses <span className="font-display text-[var(--blood)] tracking-widest">{accused?.name?.toUpperCase()}</span>
+        </div>
+        <div className="bg-card border border-[var(--gold)]/30 rounded-sm p-3 font-serif text-sm text-foreground text-center mb-4">
+          "{sospetto.behaviour}"
+        </div>
+        {meId === sospetto.caller_id ? (
+          <div className="text-center text-xs font-serif italic text-muted-foreground">
+            Awaiting the family's verdict…
+          </div>
+        ) : !canVote ? (
+          <div className="text-center text-xs font-serif italic text-muted-foreground">
+            Banished — you may not vote.
+          </div>
+        ) : myVote ? (
+          <div className="text-center text-xs font-display tracking-widest uppercase text-gold">
+            ✓ Voted: {myVote.vote === "guilty" ? "Colpevole" : "Non colpevole"}
+          </div>
+        ) : (
+          <div className="flex gap-3">
+            <button onClick={() => vote("guilty")}
+              className="flex-1 font-display tracking-widest text-sm uppercase bg-[var(--blood)] text-foreground py-4 rounded-sm">
+              Colpevole
+            </button>
+            <button onClick={() => vote("not_guilty")}
+              className="flex-1 font-display tracking-widest text-sm uppercase border border-gold text-gold py-4 rounded-sm">
+              Non colpevole
+            </button>
+          </div>
+        )}
+        <div className="mt-3 text-center text-[10px] tracking-widest uppercase text-muted-foreground/70">
+          {votes.length}/{eligible.length} voted
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SottoSospettoResultCard({ sospetto, allPlayers }: { sospetto: any; allPlayers: any[] }) {
+  const caller = allPlayers.find((p) => p.id === sospetto.caller_id);
+  const accused = allPlayers.find((p) => p.id === sospetto.accused_id);
+  const guilty = sospetto.result === "guilty";
+  const loser = guilty ? accused : caller;
+  return (
+    <div className="mt-3 bg-card border border-gold rounded-sm p-4 text-center">
+      <div className="text-[10px] tracking-widest uppercase text-gold mb-1">🕵 Sotto Sospetto · Verdetto</div>
+      <div className="font-serif text-sm mb-1">{caller?.name} → {accused?.name}</div>
+      <div className="font-display text-sm tracking-widest uppercase text-[var(--blood)]">
+        {guilty ? "COLPEVOLE" : "NON COLPEVOLE"} · {loser?.name} finishes their vessel
+      </div>
     </div>
   );
 }
