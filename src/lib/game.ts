@@ -4,6 +4,10 @@ import { pickTwoMissions } from "./missions";
 export type Role = "traitor" | "faithful";
 
 export const MURDER_FINGERS = 3;
+export const ARMORY_WIN_POINTS = 3;
+export const ARMORY_WIN_POINTS_REDUCED = 2; // ghost or banished re-entry
+
+export type PlayerState = "active" | "ghost" | "banished";
 
 /** Scale role counts to the actual player count. */
 export function roleCountsFor(n: number): Record<Role, number> {
@@ -42,17 +46,16 @@ export function assignRoles(playerIds: string[]): Record<string, Role> {
 }
 
 export async function beginNight(gameId: string, night: number) {
-  // Fetch players
+  // Fetch ALL players — ghosts and banished still receive missions.
   const { data: players, error: pErr } = await supabase
     .from("players")
-    .select("id, name, banished")
+    .select("id, name, state")
     .eq("game_id", gameId);
   if (pErr) throw pErr;
   if (!players || players.length === 0) throw new Error("No players in game");
 
-  const activePlayers = (players as any[]).filter((p) => !p.banished);
-  const ids = activePlayers.map((p) => p.id);
-  if (ids.length === 0) throw new Error("All players are banished");
+  const allPlayers = players as any[];
+  const ids = allPlayers.map((p) => p.id);
 
   // Roles are assigned ONCE on Night 1 and reused for Nights 2/3.
   let roleByPlayer: Record<string, Role> = {};
@@ -65,29 +68,17 @@ export async function beginNight(gameId: string, night: number) {
       .eq("game_id", gameId)
       .eq("night", 1);
     (prev || []).forEach((r: any) => (roleByPlayer[r.player_id] = r.role as Role));
-    // Safety: any player missing from night 1 (shouldn't happen) gets a fresh assignment.
+    // Safety: any player missing from night 1 (re-entry from Armory) gets faithful.
     const missing = ids.filter((id) => !roleByPlayer[id]);
-    if (missing.length > 0) Object.assign(roleByPlayer, assignRoles(missing));
+    missing.forEach((id) => (roleByPlayer[id] = "faithful"));
   }
 
   // Delete any existing assignments for this night (in case of re-roll)
   await supabase.from("role_assignments").delete().eq("game_id", gameId).eq("night", night);
 
-  const traitorIds = ids.filter((id) => roleByPlayer[id] === "traitor");
-  const nonTraitorIds = ids.filter((id) => roleByPlayer[id] !== "traitor");
-  const playerNames: Record<string, string> = {};
-  activePlayers.forEach((p: any) => (playerNames[p.id] = p.name));
-
   const rows = ids.map((pid) => {
     const role = roleByPlayer[pid];
     const [m1, m2] = pickTwoMissions(role);
-    let bonus_mission: string | null = null;
-    let bonus_target_id: string | null = null;
-    if (role === "traitor" && nonTraitorIds.length > 0) {
-      const tgt = nonTraitorIds[Math.floor(Math.random() * nonTraitorIds.length)];
-      bonus_target_id = tgt;
-      bonus_mission = `Eliminate ${playerNames[tgt]} — get them to take a long drink without revealing yourself.`;
-    }
     return {
       game_id: gameId,
       player_id: pid,
@@ -95,18 +86,18 @@ export async function beginNight(gameId: string, night: number) {
       role,
       mission_1: m1,
       mission_2: m2,
-      bonus_mission,
-      bonus_target_id,
+      bonus_mission: null,
+      bonus_target_id: null,
       bonus_mission_state: "pending" as const,
     };
   });
   const { error: insErr } = await supabase.from("role_assignments").insert(rows);
   if (insErr) throw insErr;
 
-  // Update game state
+  // Update game state — reset morning_revealed for the new night
   await supabase
     .from("games")
-    .update({ current_night: night, phase: "night_active" })
+    .update({ current_night: night, phase: "night_active", morning_revealed: false, morning_revealed_night: null } as any)
     .eq("id", gameId);
 }
 
@@ -162,14 +153,6 @@ export async function scoreNight(gameId: string, night: number) {
 
     // Traitor survives undetected
     if (a.role === "traitor" && !votedOut.has(a.player_id)) pts += 3;
-    // Traitor bonus murder mission: +4 pts if completed and not voted out
-    if (
-      a.role === "traitor" &&
-      a.bonus_mission_state === "completed" &&
-      !votedOut.has(a.player_id)
-    ) {
-      pts += 4;
-    }
     pointsByPlayer[a.player_id] = pts;
   }
 
@@ -211,34 +194,120 @@ export async function scoreNight(gameId: string, night: number) {
 }
 
 /**
- * Record a murder by a traitor on their bonus target.
- * Marks the bonus mission as completed and inserts a murders row.
+ * Resolve the Traitor Murder Vote. Idempotent — guarded by games.morning_revealed.
+ * Unanimous traitor votes → that player becomes a ghost and is announced.
+ * Otherwise no kill is recorded.
  */
-export async function recordMurder(
-  assignmentId: string,
-  gameId: string,
-  night: number,
-  traitorId: string,
-  victimId: string,
-) {
-  await supabase
+export async function resolveMurderVote(gameId: string, night: number) {
+  const { data: g } = await supabase
+    .from("games")
+    .select("morning_revealed, morning_revealed_night")
+    .eq("id", gameId)
+    .single();
+  if (!g) return { victim_id: null as string | null, already: false };
+  if ((g as any).morning_revealed && (g as any).morning_revealed_night === night) {
+    return { victim_id: null, already: true };
+  }
+
+  // Active traitors this night
+  const { data: traitors } = await supabase
     .from("role_assignments")
-    .update({ bonus_mission_state: "completed" })
-    .eq("id", assignmentId);
-  await supabase.from("murders").insert({
-    game_id: gameId,
-    night,
-    traitor_id: traitorId,
-    victim_id: victimId,
-    fingers: MURDER_FINGERS,
-  });
+    .select("player_id")
+    .eq("game_id", gameId)
+    .eq("night", night)
+    .eq("role", "traitor");
+  const traitorIds = (traitors || []).map((t: any) => t.player_id);
+
+  // Exclude traitors who are ghosts/banished from "active voters" — they can't murder.
+  const { data: alive } = await supabase
+    .from("players")
+    .select("id, state")
+    .in("id", traitorIds.length ? traitorIds : ["00000000-0000-0000-0000-000000000000"]);
+  const activeTraitorIds = (alive || []).filter((p: any) => p.state === "active").map((p: any) => p.id);
+
+  let victim: string | null = null;
+  if (activeTraitorIds.length > 0) {
+    const { data: votes } = await supabase
+      .from("murder_votes")
+      .select("traitor_id, victim_id")
+      .eq("game_id", gameId)
+      .eq("night", night)
+      .in("traitor_id", activeTraitorIds);
+    if (votes && votes.length === activeTraitorIds.length) {
+      const unique = new Set(votes.map((v: any) => v.victim_id));
+      if (unique.size === 1) victim = [...unique][0];
+    }
+  }
+
+  // Mark reveal as done (atomic)
+  const { data: claimed } = await supabase
+    .from("games")
+    .update({ morning_revealed: true, morning_revealed_night: night } as any)
+    .eq("id", gameId)
+    .eq("morning_revealed", false)
+    .select("id");
+  if (!claimed || claimed.length === 0) return { victim_id: null, already: true };
+
+  if (victim) {
+    // Pick any active traitor as the recorded "killer" (display only).
+    const killer = activeTraitorIds[0] || traitorIds[0];
+    await supabase.from("murders").insert({
+      game_id: gameId,
+      night,
+      traitor_id: killer,
+      victim_id: victim,
+      fingers: MURDER_FINGERS,
+    });
+    await supabase
+      .from("players")
+      .update({ state: "ghost" } as any)
+      .eq("id", victim)
+      .eq("state", "active");
+  }
+  return { victim_id: victim, already: false };
 }
 
-export async function abandonMurder(assignmentId: string) {
-  await supabase
-    .from("role_assignments")
-    .update({ bonus_mission_state: "failed" })
-    .eq("id", assignmentId);
+/**
+ * Mark armory pairings as winners. Awards points (+3 normal, +2 if ghost/banished).
+ * If a banished player is on the winning team AND reentry=true, restore them to
+ * 'active' with role 'faithful' on the current night.
+ */
+export async function recordArmoryWinner(
+  roundId: string,
+  opts: { reentry?: boolean } = {},
+) {
+  const { data: round } = await supabase
+    .from("armory_rounds")
+    .select("*")
+    .eq("id", roundId)
+    .single();
+  if (!round || (round as any).scored) return;
+  const r: any = round;
+  await supabase.from("armory_rounds").update({ is_winner: true, scored: true } as any).eq("id", roundId);
+
+  for (const pid of [r.player_a_id, r.player_b_id]) {
+    const { data: p } = await supabase.from("players").select("id, state, total_points").eq("id", pid).single();
+    if (!p) continue;
+    const reduced = (p as any).state === "ghost" || (p as any).state === "banished";
+    const pts = reduced ? ARMORY_WIN_POINTS_REDUCED : ARMORY_WIN_POINTS;
+    await supabase
+      .from("players")
+      .update({ total_points: ((p as any).total_points || 0) + pts } as any)
+      .eq("id", pid);
+    if ((p as any).state === "banished" && opts.reentry) {
+      await supabase
+        .from("players")
+        .update({ state: "active", banished: false } as any)
+        .eq("id", pid);
+      // Overwrite this player's role on the current night to 'faithful'
+      await supabase
+        .from("role_assignments")
+        .update({ role: "faithful" } as any)
+        .eq("game_id", r.game_id)
+        .eq("night", r.night)
+        .eq("player_id", pid);
+    }
+  }
 }
 
 /** Toggle this player's "ready" state for the current game phase + night. */
@@ -270,7 +339,8 @@ export async function toggleReady(
  */
 const NEXT_PHASE: Record<string, string> = {
   setup: "night_active",
-  night_active: "tribunale_missions",
+  night_active: "armory",
+  armory: "tribunale_missions",
   tribunale_missions: "tribunale_discussion",
   tribunale_discussion: "tribunale_voting",
   tribunale_voting: "tribunale_reveal",
@@ -297,11 +367,13 @@ export async function tryAdvancePhase(gameId: string) {
     .eq("game_id", gameId)
     .eq("night", night)
     .eq("phase", phase as any);
+  // Only living, active players gate phase transitions. Ghosts/banished
+  // still receive missions but don't block phase advancement.
   const { count: playerCount } = await supabase
     .from("players")
     .select("*", { count: "exact", head: true })
     .eq("game_id", gameId)
-    .eq("banished", false);
+    .eq("state", "active");
 
   const needed = Math.floor((playerCount ?? 0) / 2) + 1;
   if ((readyCount ?? 0) < needed) return;
