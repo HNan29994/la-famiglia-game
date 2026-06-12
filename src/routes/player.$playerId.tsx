@@ -5,7 +5,6 @@ import { AppHeader } from "@/components/AppHeader";
 import { Ornament } from "@/components/Ornament";
 import { RoleBadge, roleMeta } from "@/components/RoleBadge";
 import type { Role } from "@/lib/game";
-import { recordMurder, abandonMurder } from "@/lib/game";
 import { revealBanishedPlayer, getBanishedOrder } from "@/lib/game";
 import { ReadyButton } from "@/components/ReadyButton";
 import { SPECIAL_EVENTS } from "@/lib/missions";
@@ -27,6 +26,10 @@ function PlayerView() {
   const [murders, setMurders] = useState<any[]>([]);
   const [traitorAssignments, setTraitorAssignments] = useState<any[]>([]);
   const [giuros, setGiuros] = useState<any[]>([]);
+  const [murderVotes, setMurderVotes] = useState<any[]>([]);
+  const [armoryRounds, setArmoryRounds] = useState<any[]>([]);
+  const [sospetto, setSospetto] = useState<any | null>(null);
+  const [sospettoVotes, setSospettoVotes] = useState<any[]>([]);
 
   async function refresh() {
     const { data: p } = await supabase.from("players").select("*").eq("id", playerId).single();
@@ -47,6 +50,18 @@ function PlayerView() {
       setMurders(m || []);
       const { data: gq } = await supabase.from("giuros").select("*").eq("game_id", p.game_id).order("created_at", { ascending: false });
       setGiuros(gq || []);
+      const { data: mv } = await supabase.from("murder_votes").select("*").eq("game_id", p.game_id).eq("night", g.current_night);
+      setMurderVotes(mv || []);
+      const { data: ar } = await supabase.from("armory_rounds").select("*").eq("game_id", p.game_id).eq("night", g.current_night);
+      setArmoryRounds(ar || []);
+      const { data: ss } = await supabase.from("sotto_sospetto").select("*").eq("game_id", p.game_id).eq("night", g.current_night).maybeSingle();
+      setSospetto(ss);
+      if (ss) {
+        const { data: ssv } = await supabase.from("sotto_sospetto_votes").select("*").eq("sospetto_id", (ss as any).id);
+        setSospettoVotes(ssv || []);
+      } else {
+        setSospettoVotes([]);
+      }
     }
   }
 
