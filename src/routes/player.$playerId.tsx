@@ -1257,5 +1257,5 @@ function roleEmoji(r: string) {
 }
 function roleItalian(r: string) {
   if (r === "traitor") return "Il Traditore";
-  return "Il Fideli";
+  return "Fedeli";
 }
