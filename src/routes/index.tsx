@@ -40,7 +40,7 @@ function Index() {
         </div>
         <Ornament>NIGHTS · 3</Ornament>
         <div className="text-center text-xs tracking-[0.3em] uppercase text-muted-foreground">
-          18 Souls · 4 I Traditori · 14 I Fideli
+          18 Souls · 4 Traditori · 14 Fedeli
         </div>
       </div>
       <footer className="text-center pb-6 text-[10px] tracking-widest uppercase text-muted-foreground/70">

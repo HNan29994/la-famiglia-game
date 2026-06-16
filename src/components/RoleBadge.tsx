@@ -2,7 +2,7 @@ import type { Role } from "@/lib/game";
 
 const ROLE_META: Record<Role, { emoji: string; label: string; italian: string; color: string }> = {
   traitor: { emoji: "🐍", label: "Traitor", italian: "Il Traditore", color: "text-[var(--blood)]" },
-  faithful: { emoji: "👤", label: "Faithful", italian: "Il Fideli", color: "text-muted-foreground" },
+  faithful: { emoji: "👤", label: "Faithful", italian: "Fedeli", color: "text-muted-foreground" },
 };
 
 export function RoleBadge({ role, big = false }: { role: Role; big?: boolean }) {
