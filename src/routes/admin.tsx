@@ -372,3 +372,52 @@ function ArmoryAdminCard({ gameId, night, players }: { gameId: string; night: nu
     </div>
   );
 }
+
+function ForceAdvanceCard({ gameId, game }: { gameId: string; game: any }) {
+  const [busy, setBusy] = useState(false);
+  async function force() {
+    if (!confirm(`Force-advance past "${game.phase}"? Use this when a phone hasn't joined or has left and the game is stuck waiting on Ready.`)) return;
+    setBusy(true);
+    // Clear any prior transition lock for this phase, then advance.
+    await supabase
+      .from("phase_transitions")
+      .delete()
+      .eq("game_id", gameId)
+      .eq("night", game.current_night)
+      .eq("from_phase", game.phase as any);
+    // Insert a stand-in ready row for every active player so the majority gate passes.
+    const { data: ps } = await supabase
+      .from("players")
+      .select("id")
+      .eq("game_id", gameId)
+      .eq("state", "active");
+    if (ps && ps.length) {
+      const rows = ps.map((p: any) => ({
+        game_id: gameId,
+        player_id: p.id,
+        night: game.current_night,
+        phase: game.phase as any,
+      }));
+      await (supabase as any)
+        .from("phase_ready")
+        .upsert(rows, { onConflict: "game_id,player_id,night,phase", ignoreDuplicates: true });
+    }
+    await tryAdvancePhase(gameId).catch((e) => toast.error(e.message));
+    setBusy(false);
+    toast.success("Phase advanced.");
+  }
+  return (
+    <div className="mt-4 bg-card border border-[var(--blood)]/50 rounded-sm p-4">
+      <div className="text-[10px] tracking-widest uppercase text-[var(--blood)] mb-2">
+        ⏭ Force Advance · {game.phase}
+      </div>
+      <button onClick={force} disabled={busy}
+        className="w-full font-display tracking-widest text-xs uppercase border border-[var(--blood)] text-[var(--blood)] py-2 rounded-sm disabled:opacity-40">
+        {busy ? "Advancing…" : "Skip Ready Vote & Advance Phase"}
+      </button>
+      <div className="mt-2 text-[10px] tracking-widest uppercase text-muted-foreground/70 text-center">
+        Use if a phone never joined or dropped out and the game is stuck.
+      </div>
+    </div>
+  );
+}
