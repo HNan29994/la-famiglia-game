@@ -194,6 +194,9 @@ function LobbyView({ gameId, onReset }: { gameId: string; onReset: () => void })
       {game && (game.phase === "night_active" || game.phase === "armory") && (
         <ArmoryAdminCard gameId={gameId} night={game.current_night} players={players} />
       )}
+      {game && game.phase !== "setup" && (
+        <ForceAdvanceCard gameId={gameId} game={game} />
+      )}
       <div className="mt-4 grid grid-cols-2 gap-2">
         {players.map((p) => (
           <div key={p.id} className="border border-[var(--gold)]/20 rounded-sm p-2 bg-card/60">
