@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { AppHeader } from "@/components/AppHeader";
 import { Ornament } from "@/components/Ornament";
-import { getStoredGameId, setStoredGameId, resolveMurderVote, recordArmoryWinner } from "@/lib/game";
+import { getStoredGameId, setStoredGameId, resolveMurderVote, recordArmoryWinner, tryAdvancePhase } from "@/lib/game";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/admin")({
