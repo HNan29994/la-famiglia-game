@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { AppHeader } from "@/components/AppHeader";
 import { Ornament } from "@/components/Ornament";
-import { getStoredGameId, setStoredGameId, resolveMurderVote, recordArmoryWinner } from "@/lib/game";
+import { getStoredGameId, setStoredGameId, resolveMurderVote, recordArmoryWinner, tryAdvancePhase } from "@/lib/game";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/admin")({
@@ -194,6 +194,9 @@ function LobbyView({ gameId, onReset }: { gameId: string; onReset: () => void })
       {game && (game.phase === "night_active" || game.phase === "armory") && (
         <ArmoryAdminCard gameId={gameId} night={game.current_night} players={players} />
       )}
+      {game && game.phase !== "setup" && (
+        <ForceAdvanceCard gameId={gameId} game={game} />
+      )}
       <div className="mt-4 grid grid-cols-2 gap-2">
         {players.map((p) => (
           <div key={p.id} className="border border-[var(--gold)]/20 rounded-sm p-2 bg-card/60">
@@ -365,6 +368,55 @@ function ArmoryAdminCard({ gameId, night, players }: { gameId: string; night: nu
         <button onClick={addPair} className="font-display tracking-widest text-xs uppercase border border-gold text-gold px-3 rounded-sm">
           + Pair
         </button>
+      </div>
+    </div>
+  );
+}
+
+function ForceAdvanceCard({ gameId, game }: { gameId: string; game: any }) {
+  const [busy, setBusy] = useState(false);
+  async function force() {
+    if (!confirm(`Force-advance past "${game.phase}"? Use this when a phone hasn't joined or has left and the game is stuck waiting on Ready.`)) return;
+    setBusy(true);
+    // Clear any prior transition lock for this phase, then advance.
+    await supabase
+      .from("phase_transitions")
+      .delete()
+      .eq("game_id", gameId)
+      .eq("night", game.current_night)
+      .eq("from_phase", game.phase as any);
+    // Insert a stand-in ready row for every active player so the majority gate passes.
+    const { data: ps } = await supabase
+      .from("players")
+      .select("id")
+      .eq("game_id", gameId)
+      .eq("state", "active");
+    if (ps && ps.length) {
+      const rows = ps.map((p: any) => ({
+        game_id: gameId,
+        player_id: p.id,
+        night: game.current_night,
+        phase: game.phase as any,
+      }));
+      await (supabase as any)
+        .from("phase_ready")
+        .upsert(rows, { onConflict: "game_id,player_id,night,phase", ignoreDuplicates: true });
+    }
+    await tryAdvancePhase(gameId).catch((e) => toast.error(e.message));
+    setBusy(false);
+    toast.success("Phase advanced.");
+  }
+  return (
+    <div className="mt-4 bg-card border border-[var(--blood)]/50 rounded-sm p-4">
+      <div className="text-[10px] tracking-widest uppercase text-[var(--blood)] mb-2">
+        ⏭ Force Advance · {game.phase}
+      </div>
+      <button onClick={force} disabled={busy}
+        className="w-full font-display tracking-widest text-xs uppercase border border-[var(--blood)] text-[var(--blood)] py-2 rounded-sm disabled:opacity-40">
+        {busy ? "Advancing…" : "Skip Ready Vote & Advance Phase"}
+      </button>
+      <div className="mt-2 text-[10px] tracking-widest uppercase text-muted-foreground/70 text-center">
+        Use if a phone never joined or dropped out and the game is stuck.
       </div>
     </div>
   );

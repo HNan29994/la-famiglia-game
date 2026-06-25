@@ -45,12 +45,15 @@ function PlayPicker() {
   }, []);
 
   function chooseName(playerId: string) {
-    if (!gameId || !selectable) return;
+    if (!gameId) return;
     setStoredPlayerId(gameId, playerId);
     navigate({ to: "/player/$playerId", params: { playerId } });
   }
 
-  const selectable = !phase || phase === "setup";
+  // Allow players to claim/reclaim their identity at any phase — phones may
+  // join late, refresh, or swap hands. Lobby is never locked.
+  const selectable = true;
+  void phase;
 
   if (loading) return <div className="p-8 text-center text-muted-foreground">…</div>;
   if (!gameId || players.length === 0) {
